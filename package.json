@@ -1,0 +1,23 @@
+{
+  "name": "cm-dogfood-library",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tiny in-memory library desk for CodeMerlin persist-lint dogfood",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
