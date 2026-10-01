@@ -1,5 +1,4 @@
 import { getBook } from './catalog.js';
-import { getMember } from './members.js';
 import {
   countActiveNotifiedHolds,
   fulfillHold,
@@ -8,6 +7,14 @@ import {
   processReturnForHolds,
   resetHoldsForTests,
 } from './holds.js';
+import { getMember } from './members.js';
+import {
+  countHeldReservations,
+  fulfillHeldReservation,
+  getHeldReservationForMember,
+  promoteNextPending,
+  resetReservationsForTests,
+} from './reservations.js';
 import type { BookId, Loan, LoanId, MemberId } from './types.js';
 
 const LOAN_DAYS = 21;
@@ -24,6 +31,20 @@ function activeLoansForBook(bookId: BookId): Loan[] {
   return [...loans.values()].filter((loan) => loan.bookId === bookId && loan.returnedAt === null);
 }
 
+function createLoan(bookId: BookId, memberId: MemberId): Loan {
+  sequence += 1;
+  const loan: Loan = {
+    id: `loan-${sequence}`,
+    bookId,
+    memberId,
+    checkedOutAt: todayIsoDate(),
+    dueAt: todayIsoDate(LOAN_DAYS),
+    returnedAt: null,
+  };
+  loans.set(loan.id, loan);
+  return loan;
+}
+
 export function physicalAvailableCopies(bookId: BookId): number {
   const book = getBook(bookId);
   if (!book) return 0;
@@ -34,7 +55,10 @@ export function availableCopies(bookId: BookId): number {
   const book = getBook(bookId);
   if (!book) return 0;
   processHoldExpiration(bookId);
-  return Math.max(0, physicalAvailableCopies(bookId) - countActiveNotifiedHolds(bookId));
+  return Math.max(
+    0,
+    physicalAvailableCopies(bookId) - countActiveNotifiedHolds(bookId) - countHeldReservations(bookId),
+  );
 }
 
 export function checkout(input: { bookId: BookId; memberId: MemberId }): Loan {
@@ -49,6 +73,11 @@ export function checkout(input: { bookId: BookId; memberId: MemberId }): Loan {
 
   processHoldExpiration(input.bookId);
 
+  if (getHeldReservationForMember(input.bookId, input.memberId)) {
+    fulfillHeldReservation(input.bookId, input.memberId);
+    return createLoan(input.bookId, input.memberId);
+  }
+
   const physicalCopies = physicalAvailableCopies(input.bookId);
   if (physicalCopies < 1) {
     throw new Error(`no_copies_available:${input.bookId}`);
@@ -56,29 +85,19 @@ export function checkout(input: { bookId: BookId; memberId: MemberId }): Loan {
 
   const notifiedHolds = getNotifiedHoldsForBook(input.bookId);
   const memberHold = notifiedHolds.find((hold) => hold.memberId === input.memberId);
+  const unreservedCopies = physicalCopies - notifiedHolds.length - countHeldReservations(input.bookId);
 
-  if (notifiedHolds.length > 0 && !memberHold) {
-    const unreservedCopies = physicalCopies - notifiedHolds.length;
-    if (unreservedCopies < 1) {
+  if (!memberHold && unreservedCopies < 1) {
+    if (notifiedHolds.length > 0) {
       throw new Error(`queue_priority_conflict:${input.bookId}`);
     }
+    throw new Error(`copy_held_for_other_member:${input.bookId}`);
   }
 
-  sequence += 1;
-  const loan: Loan = {
-    id: `loan-${sequence}`,
-    bookId: input.bookId,
-    memberId: input.memberId,
-    checkedOutAt: todayIsoDate(),
-    dueAt: todayIsoDate(LOAN_DAYS),
-    returnedAt: null,
-  };
-  loans.set(loan.id, loan);
-
+  const loan = createLoan(input.bookId, input.memberId);
   if (memberHold) {
     fulfillHold(memberHold.id);
   }
-
   return loan;
 }
 
@@ -92,7 +111,10 @@ export function returnLoan(loanId: LoanId): Loan {
   }
   const returned: Loan = { ...loan, returnedAt: todayIsoDate() };
   loans.set(loanId, returned);
-  processReturnForHolds(loan.bookId);
+  const claimedByHold = processReturnForHolds(loan.bookId);
+  if (!claimedByHold) {
+    promoteNextPending(loan.bookId);
+  }
   return returned;
 }
 
@@ -104,4 +126,5 @@ export function resetLoansForTests(): void {
   loans.clear();
   sequence = 0;
   resetHoldsForTests();
+  resetReservationsForTests();
 }

@@ -8,6 +8,7 @@ export {
   physicalAvailableCopies,
   resetLoansForTests,
 } from './loans.js';
+export { reserveBook, cancelReservation } from './reservations.js';
 export {
   placeHold,
   processReturnForHolds,
@@ -27,6 +28,9 @@ export type {
   Hold,
   HoldStatus,
   Notification,
+  Reservation,
+  ReservationId,
+  ReservationStatus,
   BookId,
   MemberId,
   LoanId,

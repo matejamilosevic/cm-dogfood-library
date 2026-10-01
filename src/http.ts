@@ -1,7 +1,9 @@
-import { availableCopies, checkout, listLoansForMember, returnLoan } from './loans.js';
 import { findBookByIsbn, getBook, listBooks } from './catalog.js';
-import { findMemberByEmail, getMember } from './members.js';
 import { listHoldsForMember, listNotificationsForMember, placeHold } from './holds.js';
+import { availableCopies, checkout, listLoansForMember, returnLoan } from './loans.js';
+import { findMemberByEmail, getMember } from './members.js';
+import { cancelReservation, reserveBook } from './reservations.js';
+import type { Book } from './types.js';
 
 export type HttpResult = {
   status: number;
@@ -12,6 +14,10 @@ function jsonError(status: number, code: string): HttpResult {
   return { status, body: { error: code } };
 }
 
+function errorCode(error: unknown, fallback: string): string {
+  return error instanceof Error ? (error.message.split(':')[0] ?? fallback) : fallback;
+}
+
 function bookAvailability(bookId: string) {
   const available = availableCopies(bookId);
   return {
@@ -20,17 +26,28 @@ function bookAvailability(bookId: string) {
   };
 }
 
+function withAvailability(book: Book) {
+  return { ...book, ...bookAvailability(book.id) };
+}
+
+function resolveMember(record: Record<string, unknown>): { memberId: string } | HttpResult {
+  const memberId = typeof record.memberId === 'string' ? record.memberId : '';
+  if (memberId) return { memberId };
+  if (typeof record.email === 'string' && record.email) {
+    const member = findMemberByEmail(record.email);
+    if (!member) return jsonError(404, 'unknown_member');
+    return { memberId: member.id };
+  }
+  return jsonError(400, 'missing_book_or_member');
+}
+
 export function handleRequest(method: string, pathname: string, body?: unknown): HttpResult {
   if (method === 'GET' && pathname === '/health') {
     return { status: 200, body: { ok: true } };
   }
 
   if (method === 'GET' && pathname === '/books') {
-    const books = listBooks().map((book) => ({
-      ...book,
-      ...bookAvailability(book.id),
-    }));
-    return { status: 200, body: { books } };
+    return { status: 200, body: { books: listBooks().map(withAvailability) } };
   }
 
   const bookMatch = pathname.match(/^\/books\/([^/]+)$/);
@@ -62,10 +79,14 @@ export function handleRequest(method: string, pathname: string, body?: unknown):
     try {
       return { status: 201, body: { loan: checkout({ bookId, memberId }) } };
     } catch (error) {
-      const code = error instanceof Error ? error.message.split(':')[0] : 'checkout_failed';
+      const code = errorCode(error, 'checkout_failed');
       const status =
-        code === 'no_copies_available' || code === 'queue_priority_conflict' ? 409 : 404;
-      return jsonError(status, code ?? 'checkout_failed');
+        code === 'no_copies_available' ||
+        code === 'queue_priority_conflict' ||
+        code === 'copy_held_for_other_member'
+          ? 409
+          : 404;
+      return jsonError(status, code);
     }
   }
 
@@ -74,8 +95,37 @@ export function handleRequest(method: string, pathname: string, body?: unknown):
     try {
       return { status: 200, body: { loan: returnLoan(returnMatch[1] ?? '') } };
     } catch (error) {
-      const code = error instanceof Error ? error.message.split(':')[0] : 'return_failed';
-      return jsonError(code === 'already_returned' ? 409 : 404, code ?? 'return_failed');
+      const code = errorCode(error, 'return_failed');
+      return jsonError(code === 'already_returned' ? 409 : 404, code);
+    }
+  }
+
+  if (method === 'POST' && pathname === '/reservations') {
+    if (!body || typeof body !== 'object') return jsonError(400, 'invalid_json');
+    const record = body as Record<string, unknown>;
+    const bookId = typeof record.bookId === 'string' ? record.bookId : '';
+    if (!bookId) return jsonError(400, 'missing_book_or_member');
+    const resolved = resolveMember(record);
+    if ('status' in resolved) return resolved;
+    try {
+      return { status: 201, body: { reservation: reserveBook({ bookId, memberId: resolved.memberId }) } };
+    } catch (error) {
+      const code = errorCode(error, 'reservation_failed');
+      if (code === 'unknown_book' || code === 'unknown_member') return jsonError(404, code);
+      if (code === 'copies_available' || code === 'duplicate_reservation') return jsonError(409, code);
+      return jsonError(400, code);
+    }
+  }
+
+  const cancelMatch = pathname.match(/^\/reservations\/([^/]+)\/cancel$/);
+  if (method === 'POST' && cancelMatch) {
+    try {
+      return { status: 200, body: { reservation: cancelReservation(cancelMatch[1] ?? '') } };
+    } catch (error) {
+      const code = errorCode(error, 'cancel_failed');
+      if (code === 'reservation_not_found') return jsonError(404, code);
+      if (code === 'already_cancelled' || code === 'already_fulfilled') return jsonError(409, code);
+      return jsonError(400, code);
     }
   }
 

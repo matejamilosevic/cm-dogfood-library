@@ -1,6 +1,7 @@
 import { getBook } from './catalog.js';
-import { getMember } from './members.js';
 import { physicalAvailableCopies } from './loans.js';
+import { getMember } from './members.js';
+import { countHeldReservations } from './reservations.js';
 import type { BookId, Hold, HoldId, MemberId, Notification, NotificationId } from './types.js';
 
 const HOLD_DAYS = 7;
@@ -30,7 +31,10 @@ export function countActiveNotifiedHolds(bookId: BookId): number {
 }
 
 function shelfAvailableCopies(bookId: BookId): number {
-  return Math.max(0, physicalAvailableCopies(bookId) - countActiveNotifiedHolds(bookId));
+  return Math.max(
+    0,
+    physicalAvailableCopies(bookId) - countActiveNotifiedHolds(bookId) - countHeldReservations(bookId),
+  );
 }
 
 function waitingHoldsForBook(bookId: BookId): Hold[] {

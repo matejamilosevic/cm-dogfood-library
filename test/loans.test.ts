@@ -1,5 +1,17 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { handleRequest } from '../src/http.js';
 import { availableCopies, checkout, listLoansForMember, resetLoansForTests, returnLoan } from '../src/loans.js';
+import { getReservation } from '../src/reservations.js';
+
+type ReservationView = { id: string; status: string; memberId: string };
+
+function reservationFrom(body: unknown): ReservationView {
+  return (body as { reservation: ReservationView }).reservation;
+}
+
+function loanIdFrom(body: unknown): string {
+  return (body as { loan: { id: string } }).loan.id;
+}
 
 describe('loans', () => {
   beforeEach(() => {
@@ -24,5 +36,42 @@ describe('loans', () => {
     const returned = returnLoan(loan.id);
     expect(returned.returnedAt).toBeTruthy();
     expect(availableCopies('b-2')).toBe(1);
+  });
+
+  it('holds a returned copy for the front reservation without creating a loan', () => {
+    const loan = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' });
+    const reserved = handleRequest('POST', '/reservations', { bookId: 'b-2', memberId: 'm-2' });
+    const reservation = reservationFrom(reserved.body);
+
+    const returned = handleRequest('POST', `/loans/${loanIdFrom(loan.body)}/return`);
+
+    expect(returned.status).toBe(200);
+    expect(getReservation(reservation.id)?.status).toBe('held');
+    expect(listLoansForMember('m-2')).toHaveLength(0);
+    expect(availableCopies('b-2')).toBe(0);
+  });
+
+  it('rejects checkout by a member who does not hold the returned copy', () => {
+    const loan = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' });
+    handleRequest('POST', '/reservations', { bookId: 'b-2', memberId: 'm-2' });
+    handleRequest('POST', `/loans/${loanIdFrom(loan.body)}/return`);
+
+    const rejected = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' });
+
+    expect(rejected.status).toBe(409);
+    expect(rejected.body).toMatchObject({ error: 'copy_held_for_other_member' });
+  });
+
+  it('lets the member with the held copy check out and fulfills the reservation', () => {
+    const loan = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' });
+    const reserved = handleRequest('POST', '/reservations', { bookId: 'b-2', memberId: 'm-2' });
+    const reservation = reservationFrom(reserved.body);
+    handleRequest('POST', `/loans/${loanIdFrom(loan.body)}/return`);
+
+    const created = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-2' });
+
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ loan: { bookId: 'b-2', memberId: 'm-2', returnedAt: null } });
+    expect(getReservation(reservation.id)?.status).toBe('fulfilled');
   });
 });
