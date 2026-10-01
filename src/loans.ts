@@ -1,4 +1,12 @@
 import { getBook } from './catalog.js';
+import {
+  countActiveNotifiedHolds,
+  fulfillHold,
+  getNotifiedHoldsForBook,
+  processHoldExpiration,
+  processReturnForHolds,
+  resetHoldsForTests,
+} from './holds.js';
 import { getMember } from './members.js';
 import {
   countHeldReservations,
@@ -37,10 +45,20 @@ function createLoan(bookId: BookId, memberId: MemberId): Loan {
   return loan;
 }
 
+export function physicalAvailableCopies(bookId: BookId): number {
+  const book = getBook(bookId);
+  if (!book) return 0;
+  return Math.max(0, book.copies - activeLoansForBook(bookId).length);
+}
+
 export function availableCopies(bookId: BookId): number {
   const book = getBook(bookId);
   if (!book) return 0;
-  return Math.max(0, book.copies - activeLoansForBook(bookId).length - countHeldReservations(bookId));
+  processHoldExpiration(bookId);
+  return Math.max(
+    0,
+    physicalAvailableCopies(bookId) - countActiveNotifiedHolds(bookId) - countHeldReservations(bookId),
+  );
 }
 
 export function checkout(input: { bookId: BookId; memberId: MemberId }): Loan {
@@ -53,20 +71,34 @@ export function checkout(input: { bookId: BookId; memberId: MemberId }): Loan {
     throw new Error(`unknown_member:${input.memberId}`);
   }
 
-  const heldForMember = getHeldReservationForMember(input.bookId, input.memberId);
-  if (heldForMember) {
+  processHoldExpiration(input.bookId);
+
+  if (getHeldReservationForMember(input.bookId, input.memberId)) {
     fulfillHeldReservation(input.bookId, input.memberId);
     return createLoan(input.bookId, input.memberId);
   }
 
-  if (availableCopies(input.bookId) < 1) {
-    if (countHeldReservations(input.bookId) > 0) {
-      throw new Error(`copy_held_for_other_member:${input.bookId}`);
-    }
+  const physicalCopies = physicalAvailableCopies(input.bookId);
+  if (physicalCopies < 1) {
     throw new Error(`no_copies_available:${input.bookId}`);
   }
 
-  return createLoan(input.bookId, input.memberId);
+  const notifiedHolds = getNotifiedHoldsForBook(input.bookId);
+  const memberHold = notifiedHolds.find((hold) => hold.memberId === input.memberId);
+  const unreservedCopies = physicalCopies - notifiedHolds.length - countHeldReservations(input.bookId);
+
+  if (!memberHold && unreservedCopies < 1) {
+    if (notifiedHolds.length > 0) {
+      throw new Error(`queue_priority_conflict:${input.bookId}`);
+    }
+    throw new Error(`copy_held_for_other_member:${input.bookId}`);
+  }
+
+  const loan = createLoan(input.bookId, input.memberId);
+  if (memberHold) {
+    fulfillHold(memberHold.id);
+  }
+  return loan;
 }
 
 export function returnLoan(loanId: LoanId): Loan {
@@ -79,7 +111,10 @@ export function returnLoan(loanId: LoanId): Loan {
   }
   const returned: Loan = { ...loan, returnedAt: todayIsoDate() };
   loans.set(loanId, returned);
-  promoteNextPending(loan.bookId);
+  const claimedByHold = processReturnForHolds(loan.bookId);
+  if (!claimedByHold) {
+    promoteNextPending(loan.bookId);
+  }
   return returned;
 }
 
@@ -90,5 +125,6 @@ export function listLoansForMember(memberId: MemberId): Loan[] {
 export function resetLoansForTests(): void {
   loans.clear();
   sequence = 0;
+  resetHoldsForTests();
   resetReservationsForTests();
 }

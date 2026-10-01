@@ -1,6 +1,8 @@
 export type BookId = string;
 export type MemberId = string;
 export type LoanId = string;
+export type HoldId = string;
+export type NotificationId = string;
 export type ReservationId = string;
 
 export type ReservationStatus = 'pending' | 'held' | 'fulfilled' | 'cancelled';
@@ -27,6 +29,29 @@ export type Loan = {
   checkedOutAt: string;
   dueAt: string;
   returnedAt: string | null;
+};
+
+export type HoldStatus = 'waiting' | 'notified' | 'fulfilled' | 'expired' | 'cancelled';
+
+export type Hold = {
+  id: HoldId;
+  bookId: BookId;
+  memberId: MemberId;
+  status: HoldStatus;
+  createdAt: string;
+  notifiedAt: string | null;
+  expiresAt: string | null;
+  sequenceRank: number;
+};
+
+export type Notification = {
+  id: NotificationId;
+  memberId: MemberId;
+  holdId: HoldId;
+  bookId: BookId;
+  createdAt: string;
+  expiresAt: string;
+  message: string;
 };
 
 export type Reservation = {
