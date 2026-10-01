@@ -2,12 +2,14 @@ import { findBookByIsbn, getBook, listBooks } from './catalog.js';
 import { listHoldsForMember, listNotificationsForMember, placeHold } from './holds.js';
 import { availableCopies, checkout, listLoansForMember, returnLoan } from './loans.js';
 import { findMemberByEmail, getMember } from './members.js';
-import { cancelReservation, reserveBook } from './reservations.js';
+import { renderDeskHtml } from './desk.js';
+import { cancelReservation, listReservationsForMember, reserveBook } from './reservations.js';
 import type { Book } from './types.js';
 
 export type HttpResult = {
   status: number;
   body: unknown;
+  headers?: Record<string, string>;
 };
 
 function jsonError(status: number, code: string): HttpResult {
@@ -42,6 +44,14 @@ function resolveMember(record: Record<string, unknown>): { memberId: string } | 
 }
 
 export function handleRequest(method: string, pathname: string, body?: unknown): HttpResult {
+  if (method === 'GET' && pathname === '/') {
+    return {
+      status: 200,
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+      body: renderDeskHtml(),
+    };
+  }
+
   if (method === 'GET' && pathname === '/health') {
     return { status: 200, body: { ok: true } };
   }
@@ -173,6 +183,13 @@ export function handleRequest(method: string, pathname: string, body?: unknown):
     const member = getMember(memberLoans[1] ?? '');
     if (!member) return jsonError(404, 'member_not_found');
     return { status: 200, body: { loans: listLoansForMember(member.id) } };
+  }
+
+  const memberReservations = pathname.match(/^\/members\/([^/]+)\/reservations$/);
+  if (method === 'GET' && memberReservations) {
+    const member = getMember(memberReservations[1] ?? '');
+    if (!member) return jsonError(404, 'member_not_found');
+    return { status: 200, body: { reservations: listReservationsForMember(member.id) } };
   }
 
   return jsonError(404, 'not_found');
