@@ -23,7 +23,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
     ],
     "title": "Catalog and book detail report available on-shelf copies when all copies are present",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-001"
@@ -33,7 +33,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
       "SC-001"
     ],
     "harness_class": "in_repo",
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "b-1",
     "validation_type": "integration",
     "scenario_category": "happy"
@@ -49,7 +49,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
     ],
     "title": "Catalog and book detail report zero available copies when all owned copies are checked out",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-002"
@@ -59,7 +59,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
       "SC-001"
     ],
     "harness_class": "in_repo",
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "b-2, m-1",
     "validation_type": "integration",
     "scenario_category": "alt"
@@ -74,7 +74,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
     ],
     "title": "Member places reservation when no copies remain on shelf",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-003"
@@ -84,7 +84,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
       "FR-005"
     ],
     "harness_class": "in_repo",
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "b-2, m-2",
     "validation_type": "integration",
     "scenario_category": "happy"
@@ -99,7 +99,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
     ],
     "title": "Reserving a book that still has shelf copies available is rejected",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-004"
@@ -109,7 +109,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
       "SC-002"
     ],
     "harness_class": "in_repo",
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "b-1, m-1",
     "validation_type": "integration",
     "scenario_category": "error"
@@ -124,7 +124,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
     ],
     "title": "Duplicate reservation attempt by same member on same book is rejected",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-005"
@@ -134,7 +134,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
       "SC-002"
     ],
     "harness_class": "in_repo",
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "b-2, m-2",
     "validation_type": "integration",
     "scenario_category": "error"
@@ -149,7 +149,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
     ],
     "title": "Member places reservation using email address",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-003"
@@ -158,7 +158,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
       "FR-002"
     ],
     "harness_class": "in_repo",
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "b-2, alan@library.test",
     "validation_type": "integration",
     "scenario_category": "alt"
@@ -175,7 +175,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
     ],
     "title": "Returned loan holds copy for front-of-line reservation without auto-creating loan",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-006"
@@ -185,7 +185,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
       "FR-007"
     ],
     "harness_class": "in_repo",
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "b-2, m-1, m-2",
     "validation_type": "integration",
     "scenario_category": "happy"
@@ -200,7 +200,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
     ],
     "title": "Checkout by non-front member is rejected while copy is held",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-007"
@@ -210,7 +210,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
       "SC-003"
     ],
     "harness_class": "in_repo",
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "b-2, m-1, m-2",
     "validation_type": "integration",
     "scenario_category": "error"
@@ -226,7 +226,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
     ],
     "title": "Member with held copy checks out book successfully and fulfills reservation",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-008"
@@ -236,7 +236,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
       "FR-009"
     ],
     "harness_class": "in_repo",
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "b-2, m-2",
     "validation_type": "integration",
     "scenario_category": "happy"
@@ -252,7 +252,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
     ],
     "title": "Member cancels active pending reservation",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-009"
@@ -261,7 +261,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
       "FR-010"
     ],
     "harness_class": "in_repo",
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "b-2, m-2",
     "validation_type": "integration",
     "scenario_category": "happy"
@@ -277,7 +277,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
     ],
     "title": "Cancelling held reservation transfers hold to next person in queue",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-010"
@@ -287,7 +287,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
       "SC-004"
     ],
     "harness_class": "in_repo",
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "b-1, m-1, m-2",
     "validation_type": "integration",
     "scenario_category": "alt"
@@ -302,7 +302,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
     ],
     "title": "Cancelling sole held reservation returns copy to available shelf copies",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-010"
@@ -312,7 +312,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
       "SC-004"
     ],
     "harness_class": "in_repo",
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "b-2, m-1",
     "validation_type": "integration",
     "scenario_category": "alt"
@@ -328,7 +328,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
     ],
     "title": "Cancelling non-existent or already cancelled reservation returns error",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-009"
@@ -337,7 +337,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
       "FR-010"
     ],
     "harness_class": "in_repo",
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "res-nonexistent",
     "validation_type": "integration",
     "scenario_category": "error"

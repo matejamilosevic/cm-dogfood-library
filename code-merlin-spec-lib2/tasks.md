@@ -10,7 +10,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/a61aa991-d7cc-4f73-b12e-
 
 # Tasks
 
-## matejamilosevic/cm-dogfood-library
+## matejamilosevic/library
 
 ### Task 1: Define Reservation types and availability extensions in domain contracts
 - Done when:
