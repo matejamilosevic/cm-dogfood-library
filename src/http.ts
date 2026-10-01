@@ -1,8 +1,8 @@
 import { findBookByIsbn, getBook, listBooks } from './catalog.js';
 import { listHoldsForMember, listNotificationsForMember, placeHold } from './holds.js';
 import { availableCopies, checkout, listLoansForMember, returnLoan } from './loans.js';
-import { findMemberByEmail, getMember } from './members.js';
 import { renderDeskHtml } from './desk.js';
+import { findMemberByEmail, getMember, registerMemberAccount } from './members.js';
 import { cancelReservation, listReservationsForMember, reserveBook } from './reservations.js';
 import type { Book } from './types.js';
 
@@ -54,6 +54,31 @@ export function handleRequest(method: string, pathname: string, body?: unknown):
 
   if (method === 'GET' && pathname === '/health') {
     return { status: 200, body: { ok: true } };
+  }
+
+  if (method === 'POST' && pathname === '/signup') {
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+      if (body === undefined) return jsonError(400, 'missing_username_or_password');
+      return jsonError(400, 'invalid_json');
+    }
+    const record = body as Record<string, unknown>;
+    const username = typeof record.username === 'string' ? record.username.trim() : '';
+    const password = typeof record.password === 'string' ? record.password : '';
+    if (!username || password.length === 0) return jsonError(400, 'missing_username_or_password');
+    try {
+      const account = registerMemberAccount({ username, password });
+      return { status: 201, body: { account } };
+    } catch (error) {
+      const code = errorCode(error, 'signup_failed');
+      if (code === 'username_already_taken') {
+        return jsonError(409, code);
+      }
+      if (code === 'missing_username_or_password') {
+        return jsonError(400, code);
+      }
+      process.stderr.write('signup failed\n');
+      return jsonError(500, 'signup_failed');
+    }
   }
 
   if (method === 'GET' && pathname === '/books') {

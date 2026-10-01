@@ -22,6 +22,20 @@ export type Member = {
   email: string;
 };
 
+export type SignupCredentials = {
+  username: string;
+  password: string;
+};
+
+export type MemberAccount = {
+  id: string;
+  username: string;
+  passwordHash: string;
+  createdAt: string;
+};
+
+export type MemberAccountPublic = Pick<MemberAccount, 'id' | 'username' | 'createdAt'>;
+
 export type Loan = {
   id: LoanId;
   bookId: BookId;
