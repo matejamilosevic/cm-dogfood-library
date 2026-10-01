@@ -1,4 +1,4 @@
-# cm-dogfood-library
+# library
 
 Personal sandbox for dogfooding [CodeMerlin](https://github.com/AmulentTech/EngIntelligence) persist remainder lints (DC-497). It is a tiny in-memory library desk: catalog, members, checkout, and return already work. Holds, overdue fees, and waitlists do **not**.
 
@@ -41,10 +41,10 @@ FR-001 and FR-002 are already true in this repository (`src/loans.ts`, `src/cata
 FR-003 is new: add holds (do not pretend checkout already queues people).
 ```
 
-On Tech Plan, FR-001 / FR-002 should come back `already_satisfied` with notes citing those files. FR-003 should be `addressed` with an allowlist path such as `matejamilosevic/cm-dogfood-library:src/holds.ts` (or similar). Tasks should defer the satisfied FRs (`coverage_deferral` + `already_true_in_repo`) and only implement the hold files the plan named.
+On Tech Plan, FR-001 / FR-002 should come back `already_satisfied` with notes citing those files. FR-003 should be `addressed` with an allowlist path such as `matejamilosevic/library:src/holds.ts` (or similar). Tasks should defer the satisfied FRs (`coverage_deferral` + `already_true_in_repo`) and only implement the hold files the plan named.
 
 ## Connect in CodeMerlin
 
 1. Install the CodeMerlin GitHub App on **this personal repo** (or your personal account, with this repo selected).
-2. In the CodeMerlin org, add `matejamilosevic/cm-dogfood-library` and select it on the work item.
+2. In the CodeMerlin org, add `matejamilosevic/library` and select it on the work item.
 3. Generate Spec → Tech Plan → Tests → Tasks.

@@ -21,7 +21,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
     ],
     "title": "Look up book by ID or ISBN with available copies",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-001"
@@ -29,7 +29,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
     "fr_anchors": [
       "FR-001"
     ],
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "Catalog book b-1 (The Odyssey) with total copies 2 and 0 active loans",
     "validation_type": "unit",
     "scenario_category": "happy"
@@ -43,7 +43,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
     ],
     "title": "Look up book with zero available copies indicating hold eligibility",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-002"
@@ -52,7 +52,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
       "FR-001",
       "FR-004"
     ],
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "Catalog book b-2 (Pride and Prejudice) fully checked out",
     "validation_type": "unit",
     "scenario_category": "alt"
@@ -68,7 +68,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
     ],
     "title": "Check out available book creating 21-day loan and return loan to restore availability",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-003",
@@ -78,7 +78,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
       "FR-002",
       "FR-003"
     ],
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "Member m-1 (Ada) and catalog book b-1 (The Odyssey)",
     "validation_type": "integration",
     "scenario_category": "happy"
@@ -93,7 +93,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
     ],
     "title": "Place hold on fully checked out title entering FIFO queue",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-005"
@@ -103,7 +103,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
       "FR-006",
       "SC-001"
     ],
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "Book b-2 with 0 available copies and members m-1 and m-2",
     "validation_type": "integration",
     "scenario_category": "happy"
@@ -117,7 +117,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
     ],
     "title": "Reject hold placement when copies are available on shelf",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-006"
@@ -125,7 +125,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
     "fr_anchors": [
       "FR-004"
     ],
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "Book b-1 with 2 available copies and member m-1",
     "validation_type": "unit",
     "scenario_category": "error"
@@ -139,7 +139,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
     ],
     "title": "Enforce maximum limit of 3 active holds per member",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-007"
@@ -148,7 +148,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
       "FR-005",
       "SC-004"
     ],
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "Member m-1 with 3 active holds across titles b-1, b-2, b-3",
     "validation_type": "integration",
     "scenario_category": "edge"
@@ -162,7 +162,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
     ],
     "title": "Notify first member in queue with 7-day pickup deadline upon book return",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-008"
@@ -171,7 +171,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
       "FR-007",
       "SC-003"
     ],
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "Book b-2 checked out with member m-1 waiting at top of hold queue",
     "validation_type": "integration",
     "scenario_category": "happy"
@@ -185,7 +185,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
     ],
     "title": "Reject checkout attempt by non-notified member when copy is reserved for hold",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-009"
@@ -194,7 +194,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
       "FR-008",
       "SC-002"
     ],
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "Book b-2 reserved for notified member m-1, checkout attempted by member m-2",
     "validation_type": "integration",
     "scenario_category": "error"
@@ -208,7 +208,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
     ],
     "title": "Expire pickup deadline and automatically promote next waiting member",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-10"
@@ -216,7 +216,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
     "fr_anchors": [
       "FR-009"
     ],
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "Book b-2 with notified hold for m-1 past 7 days and waiting hold for m-2",
     "validation_type": "integration",
     "scenario_category": "edge"
@@ -232,7 +232,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
     ],
     "title": "Complete end-to-end user journey from search to hold placement return and priority checkout",
     "repo_keys": [
-      "matejamilosevic/cm-dogfood-library"
+      "matejamilosevic/library"
     ],
     "ac_anchors": [
       "AC-001",
@@ -247,7 +247,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
       "FR-007",
       "FR-008"
     ],
-    "home_repo_key": "matejamilosevic/cm-dogfood-library",
+    "home_repo_key": "matejamilosevic/library",
     "test_data_ref": "Lifecycle fixture: members m-1, m-2, m-3 and book b-2",
     "validation_type": "e2e",
     "scenario_category": "e2e_chain"
