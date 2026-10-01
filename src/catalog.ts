@@ -31,6 +31,16 @@ const books = new Map<BookId, Book>([
       copies: 3,
     },
   ],
+  [
+    'b-4',
+    {
+      id: 'b-4',
+      isbn: '9780141439471',
+      title: 'Frankenstein',
+      author: 'Mary Shelley',
+      copies: 1,
+    },
+  ],
 ]);
 
 export function listBooks(): Book[] {

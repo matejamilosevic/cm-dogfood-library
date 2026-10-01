@@ -1,5 +1,35 @@
 export { listBooks, getBook, findBookByIsbn } from './catalog.js';
 export { getMember, findMemberByEmail, listMembers } from './members.js';
-export { checkout, returnLoan, listLoansForMember, availableCopies } from './loans.js';
+export {
+  checkout,
+  returnLoan,
+  listLoansForMember,
+  availableCopies,
+  physicalAvailableCopies,
+  resetLoansForTests,
+} from './loans.js';
+export {
+  placeHold,
+  processReturnForHolds,
+  processHoldExpiration,
+  listHoldsForMember,
+  listNotificationsForMember,
+  getNotifiedHoldsForBook,
+  countActiveNotifiedHolds,
+  fulfillHold,
+  resetHoldsForTests,
+} from './holds.js';
 export { handleRequest } from './http.js';
-export type { Book, Member, Loan } from './types.js';
+export type {
+  Book,
+  Member,
+  Loan,
+  Hold,
+  HoldStatus,
+  Notification,
+  BookId,
+  MemberId,
+  LoanId,
+  HoldId,
+  NotificationId,
+} from './types.js';
