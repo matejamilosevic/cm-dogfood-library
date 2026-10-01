@@ -1,10 +1,109 @@
-import type { Member, MemberId } from './types.js';
+import { randomBytes, randomUUID, scryptSync } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import type { Member, MemberAccount, MemberAccountPublic, MemberId, SignupCredentials } from './types.js';
 
 const members = new Map<MemberId, Member>([
   ['m-1', { id: 'm-1', name: 'Ada Lovelace', email: 'ada@library.test' }],
   ['m-2', { id: 'm-2', name: 'Alan Turing', email: 'alan@library.test' }],
   ['m-3', { id: 'm-3', name: 'Grace Hopper', email: 'grace@library.test' }],
 ]);
+
+const accountsByUsername = new Map<string, MemberAccount>();
+let accountsFilePath: string | undefined;
+let accountsInitialized = false;
+
+function defaultAccountsFile(): string {
+  return process.env.ACCOUNTS_FILE ?? join(process.cwd(), 'data', 'accounts.json');
+}
+
+function usernameKey(username: string): string {
+  return username.trim().toLowerCase();
+}
+
+function toPublicAccount(account: MemberAccount): MemberAccountPublic {
+  return {
+    id: account.id,
+    username: account.username,
+    createdAt: account.createdAt,
+  };
+}
+
+function isStoredAccount(value: unknown): value is MemberAccount {
+  if (!value || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.id === 'string' &&
+    typeof record.username === 'string' &&
+    typeof record.passwordHash === 'string' &&
+    record.passwordHash.includes(':') &&
+    typeof record.createdAt === 'string' &&
+    !('password' in record)
+  );
+}
+
+function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(password, salt, 32).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function persistAccounts(): void {
+  if (!accountsFilePath) {
+    throw new Error('persistence_failed');
+  }
+  const directory = dirname(accountsFilePath);
+  mkdirSync(directory, { recursive: true });
+  const tempPath = `${accountsFilePath}.${process.pid}.tmp`;
+  const payload = { accounts: [...accountsByUsername.values()] };
+  try {
+    writeFileSync(tempPath, `${JSON.stringify(payload)}\n`, 'utf8');
+    renameSync(tempPath, accountsFilePath);
+  } catch (error) {
+    if (existsSync(tempPath)) unlinkSync(tempPath);
+    if (error instanceof Error && error.message === 'persistence_failed') throw error;
+    throw new Error('persistence_failed');
+  }
+}
+
+function loadAccounts(): void {
+  accountsByUsername.clear();
+  if (!accountsFilePath || !existsSync(accountsFilePath)) {
+    process.stdout.write('accounts store initialized: empty\n');
+    return;
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(accountsFilePath, 'utf8')) as unknown;
+  } catch {
+    throw new Error('accounts_store_unreadable');
+  }
+
+  const accounts = (parsed as { accounts?: unknown }).accounts;
+  if (!Array.isArray(accounts) || !accounts.every(isStoredAccount)) {
+    throw new Error('accounts_store_unreadable');
+  }
+
+  for (const account of accounts) {
+    accountsByUsername.set(usernameKey(account.username), account);
+  }
+  process.stdout.write(`accounts store initialized: ${accountsByUsername.size} accounts loaded\n`);
+}
+
+export function getAccountsFilePath(): string {
+  return accountsFilePath ?? defaultAccountsFile();
+}
+
+export function initializeAccountStore(filePath?: string): void {
+  accountsFilePath = filePath ?? accountsFilePath ?? defaultAccountsFile();
+  loadAccounts();
+  accountsInitialized = true;
+}
+
+function ensureAccountsInitialized(): void {
+  if (!accountsInitialized) initializeAccountStore();
+}
 
 export function getMember(memberId: MemberId): Member | undefined {
   return members.get(memberId);
@@ -17,4 +116,60 @@ export function findMemberByEmail(email: string): Member | undefined {
 
 export function listMembers(): Member[] {
   return [...members.values()];
+}
+
+export function getMemberAccount(username: string): MemberAccountPublic | undefined {
+  ensureAccountsInitialized();
+  const account = accountsByUsername.get(usernameKey(username));
+  return account ? toPublicAccount(account) : undefined;
+}
+
+export function listMemberAccounts(): MemberAccountPublic[] {
+  ensureAccountsInitialized();
+  return [...accountsByUsername.values()].map(toPublicAccount);
+}
+
+export function registerMemberAccount(input: SignupCredentials): MemberAccountPublic {
+  ensureAccountsInitialized();
+  const username = input.username.trim();
+  const password = input.password;
+  if (!username || password.length === 0) {
+    throw new Error('missing_username_or_password');
+  }
+
+  const key = usernameKey(username);
+  if (accountsByUsername.has(key)) {
+    process.stderr.write(`WARN duplicate username: ${username}\n`);
+    throw new Error('username_already_taken');
+  }
+
+  const account: MemberAccount = {
+    id: `m-acc-${randomUUID()}`,
+    username,
+    passwordHash: hashPassword(password),
+    createdAt: new Date().toISOString(),
+  };
+  accountsByUsername.set(key, account);
+  try {
+    persistAccounts();
+  } catch {
+    accountsByUsername.delete(key);
+    process.stderr.write('account persistence failed\n');
+    throw new Error('persistence_failed');
+  }
+
+  process.stdout.write(`account registered: ${username}\n`);
+  return toPublicAccount(account);
+}
+
+export function reloadAccountsFromDisk(): void {
+  const filePath = getAccountsFilePath();
+  accountsInitialized = false;
+  initializeAccountStore(filePath);
+}
+
+export function resetAccountsForTests(filePath: string): void {
+  accountsByUsername.clear();
+  accountsInitialized = false;
+  initializeAccountStore(filePath);
 }

@@ -1,5 +1,16 @@
 export { listBooks, getBook, findBookByIsbn } from './catalog.js';
-export { getMember, findMemberByEmail, listMembers } from './members.js';
+export {
+  getMember,
+  findMemberByEmail,
+  listMembers,
+  initializeAccountStore,
+  registerMemberAccount,
+  getMemberAccount,
+  listMemberAccounts,
+  reloadAccountsFromDisk,
+  resetAccountsForTests,
+  getAccountsFilePath,
+} from './members.js';
 export {
   checkout,
   returnLoan,
@@ -24,6 +35,9 @@ export { handleRequest } from './http.js';
 export type {
   Book,
   Member,
+  MemberAccount,
+  MemberAccountPublic,
+  SignupCredentials,
   Loan,
   Hold,
   HoldStatus,
