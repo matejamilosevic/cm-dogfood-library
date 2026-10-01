@@ -3,6 +3,7 @@ import type { Member, MemberId } from './types.js';
 const members = new Map<MemberId, Member>([
   ['m-1', { id: 'm-1', name: 'Ada Lovelace', email: 'ada@library.test' }],
   ['m-2', { id: 'm-2', name: 'Alan Turing', email: 'alan@library.test' }],
+  ['m-3', { id: 'm-3', name: 'Grace Hopper', email: 'grace@library.test' }],
 ]);
 
 export function getMember(memberId: MemberId): Member | undefined {

@@ -1,5 +1,13 @@
 import { getBook } from './catalog.js';
 import { getMember } from './members.js';
+import {
+  countActiveNotifiedHolds,
+  fulfillHold,
+  getNotifiedHoldsForBook,
+  processHoldExpiration,
+  processReturnForHolds,
+  resetHoldsForTests,
+} from './holds.js';
 import type { BookId, Loan, LoanId, MemberId } from './types.js';
 
 const LOAN_DAYS = 21;
@@ -16,10 +24,17 @@ function activeLoansForBook(bookId: BookId): Loan[] {
   return [...loans.values()].filter((loan) => loan.bookId === bookId && loan.returnedAt === null);
 }
 
-export function availableCopies(bookId: BookId): number {
+export function physicalAvailableCopies(bookId: BookId): number {
   const book = getBook(bookId);
   if (!book) return 0;
   return Math.max(0, book.copies - activeLoansForBook(bookId).length);
+}
+
+export function availableCopies(bookId: BookId): number {
+  const book = getBook(bookId);
+  if (!book) return 0;
+  processHoldExpiration(bookId);
+  return Math.max(0, physicalAvailableCopies(bookId) - countActiveNotifiedHolds(bookId));
 }
 
 export function checkout(input: { bookId: BookId; memberId: MemberId }): Loan {
@@ -31,8 +46,22 @@ export function checkout(input: { bookId: BookId; memberId: MemberId }): Loan {
   if (!member) {
     throw new Error(`unknown_member:${input.memberId}`);
   }
-  if (availableCopies(input.bookId) < 1) {
+
+  processHoldExpiration(input.bookId);
+
+  const physicalCopies = physicalAvailableCopies(input.bookId);
+  if (physicalCopies < 1) {
     throw new Error(`no_copies_available:${input.bookId}`);
+  }
+
+  const notifiedHolds = getNotifiedHoldsForBook(input.bookId);
+  const memberHold = notifiedHolds.find((hold) => hold.memberId === input.memberId);
+
+  if (notifiedHolds.length > 0 && !memberHold) {
+    const unreservedCopies = physicalCopies - notifiedHolds.length;
+    if (unreservedCopies < 1) {
+      throw new Error(`queue_priority_conflict:${input.bookId}`);
+    }
   }
 
   sequence += 1;
@@ -45,6 +74,11 @@ export function checkout(input: { bookId: BookId; memberId: MemberId }): Loan {
     returnedAt: null,
   };
   loans.set(loan.id, loan);
+
+  if (memberHold) {
+    fulfillHold(memberHold.id);
+  }
+
   return loan;
 }
 
@@ -58,6 +92,7 @@ export function returnLoan(loanId: LoanId): Loan {
   }
   const returned: Loan = { ...loan, returnedAt: todayIsoDate() };
   loans.set(loanId, returned);
+  processReturnForHolds(loan.bookId);
   return returned;
 }
 
@@ -68,4 +103,5 @@ export function listLoansForMember(memberId: MemberId): Loan[] {
 export function resetLoansForTests(): void {
   loans.clear();
   sequence = 0;
+  resetHoldsForTests();
 }

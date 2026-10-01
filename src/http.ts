@@ -1,6 +1,7 @@
-import { checkout, listLoansForMember, returnLoan } from './loans.js';
+import { availableCopies, checkout, listLoansForMember, returnLoan } from './loans.js';
 import { findBookByIsbn, getBook, listBooks } from './catalog.js';
 import { findMemberByEmail, getMember } from './members.js';
+import { listHoldsForMember, listNotificationsForMember, placeHold } from './holds.js';
 
 export type HttpResult = {
   status: number;
@@ -11,20 +12,40 @@ function jsonError(status: number, code: string): HttpResult {
   return { status, body: { error: code } };
 }
 
+function bookAvailability(bookId: string) {
+  const available = availableCopies(bookId);
+  return {
+    availableCopies: available,
+    holdEligible: available === 0,
+  };
+}
+
 export function handleRequest(method: string, pathname: string, body?: unknown): HttpResult {
   if (method === 'GET' && pathname === '/health') {
     return { status: 200, body: { ok: true } };
   }
 
   if (method === 'GET' && pathname === '/books') {
-    return { status: 200, body: { books: listBooks() } };
+    const books = listBooks().map((book) => ({
+      ...book,
+      ...bookAvailability(book.id),
+    }));
+    return { status: 200, body: { books } };
   }
 
   const bookMatch = pathname.match(/^\/books\/([^/]+)$/);
   if (method === 'GET' && bookMatch) {
-    const book = getBook(bookMatch[1] ?? '') ?? findBookByIsbn(decodeURIComponent(bookMatch[1] ?? ''));
+    const raw = decodeURIComponent(bookMatch[1] ?? '');
+    const book = getBook(raw) ?? findBookByIsbn(raw);
     if (!book) return jsonError(404, 'book_not_found');
-    return { status: 200, body: { book } };
+    const availability = bookAvailability(book.id);
+    return {
+      status: 200,
+      body: {
+        book: { ...book, ...availability },
+        ...availability,
+      },
+    };
   }
 
   if (method === 'POST' && pathname === '/loans') {
@@ -42,7 +63,8 @@ export function handleRequest(method: string, pathname: string, body?: unknown):
       return { status: 201, body: { loan: checkout({ bookId, memberId }) } };
     } catch (error) {
       const code = error instanceof Error ? error.message.split(':')[0] : 'checkout_failed';
-      const status = code === 'no_copies_available' ? 409 : 404;
+      const status =
+        code === 'no_copies_available' || code === 'queue_priority_conflict' ? 409 : 404;
       return jsonError(status, code ?? 'checkout_failed');
     }
   }
@@ -55,6 +77,45 @@ export function handleRequest(method: string, pathname: string, body?: unknown):
       const code = error instanceof Error ? error.message.split(':')[0] : 'return_failed';
       return jsonError(code === 'already_returned' ? 409 : 404, code ?? 'return_failed');
     }
+  }
+
+  if (method === 'POST' && pathname === '/holds') {
+    if (!body || typeof body !== 'object') return jsonError(400, 'invalid_json');
+    const record = body as Record<string, unknown>;
+    const bookId = typeof record.bookId === 'string' ? record.bookId : '';
+    const memberId =
+      typeof record.memberId === 'string'
+        ? record.memberId
+        : typeof record.email === 'string'
+          ? (findMemberByEmail(record.email)?.id ?? '')
+          : '';
+    if (!bookId || !memberId) return jsonError(400, 'missing_book_or_member');
+    try {
+      return { status: 201, body: { hold: placeHold({ bookId, memberId }) } };
+    } catch (error) {
+      const code = error instanceof Error ? error.message.split(':')[0] : 'hold_failed';
+      let status = 400;
+      if (code === 'copies_available' || code === 'duplicate_hold' || code === 'hold_limit_exceeded') {
+        status = 409;
+      } else if (code === 'unknown_book' || code === 'unknown_member') {
+        status = 404;
+      }
+      return jsonError(status, code ?? 'hold_failed');
+    }
+  }
+
+  const memberHolds = pathname.match(/^\/members\/([^/]+)\/holds$/);
+  if (method === 'GET' && memberHolds) {
+    const member = getMember(memberHolds[1] ?? '');
+    if (!member) return jsonError(404, 'member_not_found');
+    return { status: 200, body: { holds: listHoldsForMember(member.id) } };
+  }
+
+  const memberNotifications = pathname.match(/^\/members\/([^/]+)\/notifications$/);
+  if (method === 'GET' && memberNotifications) {
+    const member = getMember(memberNotifications[1] ?? '');
+    if (!member) return jsonError(404, 'member_not_found');
+    return { status: 200, body: { notifications: listNotificationsForMember(member.id) } };
   }
 
   const memberLoans = pathname.match(/^\/members\/([^/]+)\/loans$/);
