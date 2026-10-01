@@ -10,7 +10,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
 
 # Tasks
 
-## matejamilosevic/cm-dogfood-library
+## matejamilosevic/library
 
 ### Task 1: Preserved catalog lookup behavior is already satisfied in the repository
 - Kind: Coverage Deferral

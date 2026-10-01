@@ -14,7 +14,7 @@ Work Item URL: https://staging.codemerlin.ai/work-items/b3272e5a-7bf5-426c-9072-
 **Change magnitude: MEDIUM**
 
 ## Current state vs target state
-In the existing `matejamilosevic/cm-dogfood-library` repository, members can look up books by ID or ISBN (`src/catalog.ts`), check out available copies (`checkout` in `src/loans.ts`), and return loans (`returnLoan` in `src/loans.ts`). However, when all copies of a title are checked out, there is no waitlist capability (`README.md` explicitly notes that holds and waitlists do not work).
+In the existing `matejamilosevic/library` repository, members can look up books by ID or ISBN (`src/catalog.ts`), check out available copies (`checkout` in `src/loans.ts`), and return loans (`returnLoan` in `src/loans.ts`). However, when all copies of a title are checked out, there is no waitlist capability (`README.md` explicitly notes that holds and waitlists do not work).
 
 The target state introduces waitlist hold management:
 1. When `availableCopies(bookId)` equals 0, members can place a hold (`POST /holds`), placing them in a strict FIFO queue for that title.
@@ -47,7 +47,7 @@ New:
    - *Decision*: Process hold expiration lazily during hold placement, checkout, and loan return calls. Because this is an in-memory application without persistent background workers, synchronous lazy evaluation guarantees exact temporal accuracy without timer leak risks in Vitest test runs.
 
 ## Component / module ownership
-- `matejamilosevic/cm-dogfood-library`: Single deployable package owning catalog, members, loans, holds, and HTTP routing.
+- `matejamilosevic/library`: Single deployable package owning catalog, members, loans, holds, and HTTP routing.
 - Components NOT modified: `src/catalog.ts`, `src/members.ts`, `src/server.ts`.
 
 ## Service interaction patterns
@@ -61,15 +61,15 @@ New:
 - Single-tenant library desk application; isolation is enforced per `memberId` and `bookId` across all hold and loan operations.
 
 ## Affected components
-- **matejamilosevic/cm-dogfood-library** — Add hold waitlist queue, 3-hold limit enforcement, return notification allocation, priority checkout protection, and expiration handling across `src/types.ts`, `src/holds.ts`, `src/loans.ts`, `src/http.ts`, `src/index.ts`, and `test/holds.test.ts`.
+- **matejamilosevic/library** — Add hold waitlist queue, 3-hold limit enforcement, return notification allocation, priority checkout protection, and expiration handling across `src/types.ts`, `src/holds.ts`, `src/loans.ts`, `src/http.ts`, `src/index.ts`, and `test/holds.test.ts`.
 
 ## Affected component allowlist
-- `matejamilosevic/cm-dogfood-library:src/types.ts` (modify) `Hold, HoldStatus, Notification`
-- `matejamilosevic/cm-dogfood-library:src/holds.ts` (create) `placeHold, processReturnForHolds, processHoldExpiration, listHoldsForMember`
-- `matejamilosevic/cm-dogfood-library:src/loans.ts` (modify) `checkout, returnLoan`
-- `matejamilosevic/cm-dogfood-library:src/http.ts` (modify) `handleRequest`
-- `matejamilosevic/cm-dogfood-library:src/index.ts` (modify) `holds module exports`
-- `matejamilosevic/cm-dogfood-library:test/holds.test.ts` (create) `holds test suite`
+- `matejamilosevic/library:src/types.ts` (modify) `Hold, HoldStatus, Notification`
+- `matejamilosevic/library:src/holds.ts` (create) `placeHold, processReturnForHolds, processHoldExpiration, listHoldsForMember`
+- `matejamilosevic/library:src/loans.ts` (modify) `checkout, returnLoan`
+- `matejamilosevic/library:src/http.ts` (modify) `handleRequest`
+- `matejamilosevic/library:src/index.ts` (modify) `holds module exports`
+- `matejamilosevic/library:test/holds.test.ts` (create) `holds test suite`
 
 ## Data model changes
 Data store updates in `src/types.ts` and `src/holds.ts` (In-Memory Maps):
@@ -95,7 +95,7 @@ Data store updates in `src/types.ts` and `src/holds.ts` (In-Memory Maps):
 3. **In-Memory Holds Map** (`src/holds.ts`):
    - Map key: `HoldId` (`string`), Value: `Hold`
    - Map key: `NotificationId` (`string`), Value: `Notification`
-   - Storage definition path: `matejamilosevic/cm-dogfood-library:src/holds.ts`
+   - Storage definition path: `matejamilosevic/library:src/holds.ts`
 
 ## API changes
 1. **`POST /holds`** (New Route in `src/http.ts`):
@@ -138,10 +138,10 @@ Rollback Strategy:
 ## Repository Matrix
 | Repository Name | Needs Change | Role | Suggested Ship Order |
 | --- | --- | --- | --- |
-| matejamilosevic/cm-dogfood-library | Yes | In-memory library desk server managing catalog, members, loans, holds, and HTTP endpoints. | 1 |
+| matejamilosevic/library | Yes | In-memory library desk server managing catalog, members, loans, holds, and HTTP endpoints. | 1 |
 
 ## Repository scope
-Single repository scope: `matejamilosevic/cm-dogfood-library`. All changes are in-memory TypeScript module additions and updates.
+Single repository scope: `matejamilosevic/library`. All changes are in-memory TypeScript module additions and updates.
 
 ## Risks
 1. **Queue Priority Bypass Risk**: Non-notified members might check out a copy reserved for a hold holder. *Mitigation*: `checkout()` in `src/loans.ts` explicitly inspects active notified holds for the title and rejects non-notified borrowers with `queue_priority_conflict`.

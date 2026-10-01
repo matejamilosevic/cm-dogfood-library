@@ -29,5 +29,5 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(port, () => {
-  process.stdout.write(`cm-dogfood-library listening on http://localhost:${port}\n`);
+  process.stdout.write(`library listening on http://localhost:${port}\n`);
 });

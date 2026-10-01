@@ -35,7 +35,7 @@ The implementation introduces new public HTTP API routes (`POST /reservations`, 
 3. **Availability Computation Formula**: We compute `availableCopies` as `book.copies - activeLoansCount - heldReservationsCount`. Held copies are physically in the library but reserved exclusively for the front-of-line patron, so they must not be counted as unreserved shelf copies available for general checkout or new reservations.
 
 ## Component / module ownership
-- **`cm-dogfood-library` (`matejamilosevic/cm-dogfood-library`)**:
+- **`library` (`matejamilosevic/library`)**:
   - `src/types.ts`: Owns data contract definitions for `ReservationId`, `ReservationStatus`, `Reservation`, and `Book` extensions.
   - `src/reservations.ts`: Owns reservation storage, FIFO queue ordering, hold assignments, duplicate checks, and cancellation hold reallocation.
   - `src/loans.ts`: Owns loan lifecycle, checkout hold enforcement, reservation fulfillment upon checkout, and triggering hold allocation upon return.
@@ -54,17 +54,17 @@ None. All capabilities are active immediately upon process deployment.
 Single-tenant in-memory prototype. There is no multi-tenancy, workspace, organization partitioning, or user authentication in scope.
 
 ## Affected components
-- **cm-dogfood-library** — Implements in-memory reservation tracking in `src/reservations.ts`, hold validation in `src/loans.ts`, `availableCopies` reporting and reservation endpoints in `src/http.ts`, types in `src/types.ts`, public exports in `src/index.ts`, and test coverage across `test/reservations.test.ts`, `test/loans.test.ts`, and `test/http.test.ts`.
+- **library** — Implements in-memory reservation tracking in `src/reservations.ts`, hold validation in `src/loans.ts`, `availableCopies` reporting and reservation endpoints in `src/http.ts`, types in `src/types.ts`, public exports in `src/index.ts`, and test coverage across `test/reservations.test.ts`, `test/loans.test.ts`, and `test/http.test.ts`.
 
 ## Affected component allowlist
-- `matejamilosevic/cm-dogfood-library:src/types.ts` (modify) `Reservation`
-- `matejamilosevic/cm-dogfood-library:src/reservations.ts` (create) `reserveBook`
-- `matejamilosevic/cm-dogfood-library:src/loans.ts` (modify) `availableCopies`
-- `matejamilosevic/cm-dogfood-library:src/http.ts` (modify) `handleRequest`
-- `matejamilosevic/cm-dogfood-library:src/index.ts` (modify) `reserveBook`
-- `matejamilosevic/cm-dogfood-library:test/reservations.test.ts` (create) `reservations`
-- `matejamilosevic/cm-dogfood-library:test/loans.test.ts` (modify) `loans`
-- `matejamilosevic/cm-dogfood-library:test/http.test.ts` (modify) `http`
+- `matejamilosevic/library:src/types.ts` (modify) `Reservation`
+- `matejamilosevic/library:src/reservations.ts` (create) `reserveBook`
+- `matejamilosevic/library:src/loans.ts` (modify) `availableCopies`
+- `matejamilosevic/library:src/http.ts` (modify) `handleRequest`
+- `matejamilosevic/library:src/index.ts` (modify) `reserveBook`
+- `matejamilosevic/library:test/reservations.test.ts` (create) `reservations`
+- `matejamilosevic/library:test/loans.test.ts` (modify) `loans`
+- `matejamilosevic/library:test/http.test.ts` (modify) `http`
 
 ## Data model changes
 No persistent storage, SQL database, or schema migrations exist in this service. In-memory data structures are extended as follows:
@@ -200,17 +200,17 @@ No persistent storage, SQL database, or schema migrations exist in this service.
 3. **Rollback Strategy**: If regressions occur, revert the commit and restart the service. Because state is in-memory only, no storage rollbacks or migration reversions are needed.
 
 ## Operational considerations
-- **Observability / Telemetry**: Server startup emits port binding information to standard output (`cm-dogfood-library listening on http://localhost:${port}`). HTTP status codes should be monitored: 201 for reservations and checkouts; 409 for reservation rejections (when shelf copies are available or duplicate reservations occur) and checkout conflicts.
+- **Observability / Telemetry**: Server startup emits port binding information to standard output (`library listening on http://localhost:${port}`). HTTP status codes should be monitored: 201 for reservations and checkouts; 409 for reservation rejections (when shelf copies are available or duplicate reservations occur) and checkout conflicts.
 - **Background Processing**: None. All queue mutations, hold evaluations, and transfers occur synchronously within request handling.
 - **Error Handling**: Missing books/members return 404; state validation failures (e.g. reserving an available book or duplicate reservations) return 409.
 
 ## Repository Matrix
 | Repository Name | Needs Change | Role | Suggested Ship Order |
 | --- | --- | --- | --- |
-| matejamilosevic/cm-dogfood-library | Yes | Single in-memory library service owning catalog, loans, reservations, and HTTP API. | 1 |
+| matejamilosevic/library | Yes | Single in-memory library service owning catalog, loans, reservations, and HTTP API. | 1 |
 
 ## Repository scope
-Single repository: `matejamilosevic/cm-dogfood-library`. All changes are self-contained within this repository.
+Single repository: `matejamilosevic/library`. All changes are self-contained within this repository.
 
 ## Risks
 1. **Condition**: An active hold is not properly fulfilled when the designated member completes checkout.
