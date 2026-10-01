@@ -1,6 +1,9 @@
 export type BookId = string;
 export type MemberId = string;
 export type LoanId = string;
+export type ReservationId = string;
+
+export type ReservationStatus = 'pending' | 'held' | 'fulfilled' | 'cancelled';
 
 export type Book = {
   id: BookId;
@@ -8,6 +11,7 @@ export type Book = {
   title: string;
   author: string;
   copies: number;
+  availableCopies?: number;
 };
 
 export type Member = {
@@ -23,4 +27,12 @@ export type Loan = {
   checkedOutAt: string;
   dueAt: string;
   returnedAt: string | null;
+};
+
+export type Reservation = {
+  id: ReservationId;
+  bookId: BookId;
+  memberId: MemberId;
+  createdAt: string;
+  status: ReservationStatus;
 };

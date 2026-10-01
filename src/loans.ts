@@ -1,5 +1,12 @@
 import { getBook } from './catalog.js';
 import { getMember } from './members.js';
+import {
+  countHeldReservations,
+  fulfillHeldReservation,
+  getHeldReservationForMember,
+  promoteNextPending,
+  resetReservationsForTests,
+} from './reservations.js';
 import type { BookId, Loan, LoanId, MemberId } from './types.js';
 
 const LOAN_DAYS = 21;
@@ -16,10 +23,24 @@ function activeLoansForBook(bookId: BookId): Loan[] {
   return [...loans.values()].filter((loan) => loan.bookId === bookId && loan.returnedAt === null);
 }
 
+function createLoan(bookId: BookId, memberId: MemberId): Loan {
+  sequence += 1;
+  const loan: Loan = {
+    id: `loan-${sequence}`,
+    bookId,
+    memberId,
+    checkedOutAt: todayIsoDate(),
+    dueAt: todayIsoDate(LOAN_DAYS),
+    returnedAt: null,
+  };
+  loans.set(loan.id, loan);
+  return loan;
+}
+
 export function availableCopies(bookId: BookId): number {
   const book = getBook(bookId);
   if (!book) return 0;
-  return Math.max(0, book.copies - activeLoansForBook(bookId).length);
+  return Math.max(0, book.copies - activeLoansForBook(bookId).length - countHeldReservations(bookId));
 }
 
 export function checkout(input: { bookId: BookId; memberId: MemberId }): Loan {
@@ -31,21 +52,21 @@ export function checkout(input: { bookId: BookId; memberId: MemberId }): Loan {
   if (!member) {
     throw new Error(`unknown_member:${input.memberId}`);
   }
+
+  const heldForMember = getHeldReservationForMember(input.bookId, input.memberId);
+  if (heldForMember) {
+    fulfillHeldReservation(input.bookId, input.memberId);
+    return createLoan(input.bookId, input.memberId);
+  }
+
   if (availableCopies(input.bookId) < 1) {
+    if (countHeldReservations(input.bookId) > 0) {
+      throw new Error(`copy_held_for_other_member:${input.bookId}`);
+    }
     throw new Error(`no_copies_available:${input.bookId}`);
   }
 
-  sequence += 1;
-  const loan: Loan = {
-    id: `loan-${sequence}`,
-    bookId: input.bookId,
-    memberId: input.memberId,
-    checkedOutAt: todayIsoDate(),
-    dueAt: todayIsoDate(LOAN_DAYS),
-    returnedAt: null,
-  };
-  loans.set(loan.id, loan);
-  return loan;
+  return createLoan(input.bookId, input.memberId);
 }
 
 export function returnLoan(loanId: LoanId): Loan {
@@ -58,6 +79,7 @@ export function returnLoan(loanId: LoanId): Loan {
   }
   const returned: Loan = { ...loan, returnedAt: todayIsoDate() };
   loans.set(loanId, returned);
+  promoteNextPending(loan.bookId);
   return returned;
 }
 
@@ -68,4 +90,5 @@ export function listLoansForMember(memberId: MemberId): Loan[] {
 export function resetLoansForTests(): void {
   loans.clear();
   sequence = 0;
+  resetReservationsForTests();
 }
