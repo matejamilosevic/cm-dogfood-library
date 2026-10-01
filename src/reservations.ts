@@ -16,6 +16,10 @@ function byQueueOrder(a: Reservation, b: Reservation): number {
   return a.id.localeCompare(b.id, undefined, { numeric: true });
 }
 
+export function listReservationsForMember(memberId: MemberId): Reservation[] {
+  return [...reservations.values()].filter((reservation) => reservation.memberId === memberId);
+}
+
 export function listActiveReservations(bookId: BookId): Reservation[] {
   return [...reservations.values()]
     .filter((reservation) => reservation.bookId === bookId && isActive(reservation.status))

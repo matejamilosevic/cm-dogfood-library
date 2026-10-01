@@ -28,7 +28,15 @@ export function startServer(port = Number(process.env.PORT ?? 3456)): Server {
     }
 
     const result = handleRequest(req.method ?? 'GET', url.pathname, body);
-    res.writeHead(result.status, { 'content-type': 'application/json' });
+    const headers = {
+      'content-type': 'application/json',
+      ...result.headers,
+    };
+    res.writeHead(result.status, headers);
+    if (typeof result.body === 'string') {
+      res.end(result.body);
+      return;
+    }
     res.end(JSON.stringify(result.body));
   });
 
