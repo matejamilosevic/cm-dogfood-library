@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { resetHoldsForTests } from '../src/holds.js';
 import { handleRequest } from '../src/http.js';
+import { authHeaders } from './session.js';
 import { resetLoansForTests } from '../src/loans.js';
 import {
   getAccountsFilePath,
@@ -202,14 +203,14 @@ describe('member signup', () => {
     expect(books.status).toBe(200);
     expect(books.body).toMatchObject({ books: expect.any(Array) });
 
-    const loan = handleRequest('POST', '/loans', { bookId: 'b-1', memberId: 'm-1' });
+    const loan = handleRequest('POST', '/loans', { bookId: 'b-1', memberId: 'm-1' }, authHeaders('m-1'));
     expect(loan.status).toBe(201);
 
-    const checkedOut = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' });
+    const checkedOut = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' }, authHeaders('m-1'));
     expect(checkedOut.status).toBe(201);
-    const reservation = handleRequest('POST', '/reservations', { bookId: 'b-2', memberId: 'm-2' });
+    const reservation = handleRequest('POST', '/reservations', { bookId: 'b-2', memberId: 'm-2' }, authHeaders('m-2'));
     expect(reservation.status).toBe(201);
-    const hold = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-3' });
+    const hold = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-3' }, authHeaders('m-3'));
     expect(hold.status).toBe(201);
   });
 

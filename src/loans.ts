@@ -101,6 +101,10 @@ export function checkout(input: { bookId: BookId; memberId: MemberId }): Loan {
   return loan;
 }
 
+export function getLoan(loanId: LoanId): Loan | undefined {
+  return loans.get(loanId);
+}
+
 export function returnLoan(loanId: LoanId): Loan {
   const loan = loans.get(loanId);
   if (!loan) {

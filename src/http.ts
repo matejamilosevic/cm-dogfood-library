@@ -1,12 +1,11 @@
 import { findBookByIsbn, getBook, listBooks } from './catalog.js';
 import { listHoldsForMember, listNotificationsForMember, placeHold } from './holds.js';
-import { availableCopies, checkout, listLoansForMember, returnLoan } from './loans.js';
+import { availableCopies, checkout, getLoan, listLoansForMember, returnLoan } from './loans.js';
 import { renderDeskHtml } from './desk.js';
 import {
   checkRateLimit,
   clearRateLimit,
   createSession,
-  findMemberByEmail,
   getMember,
   getSession,
   recordFailedSignIn,
@@ -14,7 +13,7 @@ import {
   revokeSession,
   verifyCredentials,
 } from './members.js';
-import { cancelReservation, listReservationsForMember, reserveBook } from './reservations.js';
+import { cancelReservation, getReservation, listReservationsForMember, reserveBook } from './reservations.js';
 import type { Book } from './types.js';
 
 export type HttpResult = {
@@ -52,15 +51,51 @@ function withAvailability(book: Book) {
   return { ...book, ...bookAvailability(book.id) };
 }
 
-function resolveMember(record: Record<string, unknown>): { memberId: string } | HttpResult {
-  const memberId = typeof record.memberId === 'string' ? record.memberId : '';
-  if (memberId) return { memberId };
-  if (typeof record.email === 'string' && record.email) {
-    const member = findMemberByEmail(record.email);
-    if (!member) return jsonError(404, 'unknown_member');
-    return { memberId: member.id };
+type SessionAuth = { accountId: string };
+
+function requireSession(headers?: Record<string, string | string[] | undefined>): SessionAuth | HttpResult {
+  const token = bearerToken(headers);
+  const session = token ? getSession(token) : undefined;
+  if (!session) {
+    process.stderr.write('WARN unauthorized\n');
+    return jsonError(401, 'unauthorized');
   }
-  return jsonError(400, 'missing_book_or_member');
+  return { accountId: session.accountId };
+}
+
+function isRefusal<T extends object>(result: T | HttpResult): result is HttpResult {
+  return 'status' in result;
+}
+
+function refuseForeignMember(): HttpResult {
+  process.stderr.write('WARN forbidden\n');
+  return jsonError(403, 'forbidden');
+}
+
+function requireActingMember(
+  headers: Record<string, string | string[] | undefined> | undefined,
+  body: unknown,
+): { accountId: string; record: Record<string, unknown> } | HttpResult {
+  const session = requireSession(headers);
+  if (isRefusal(session)) return session;
+  if (!body || typeof body !== 'object') return jsonError(400, 'invalid_json');
+  const record = body as Record<string, unknown>;
+  const memberId = typeof record.memberId === 'string' ? record.memberId : '';
+  if (memberId && memberId !== session.accountId) return refuseForeignMember();
+  return { accountId: session.accountId, record };
+}
+
+function readOwnActivity(
+  headers: Record<string, string | string[] | undefined> | undefined,
+  memberId: string,
+  present: (id: string) => HttpResult,
+): HttpResult {
+  const session = requireSession(headers);
+  if (isRefusal(session)) return session;
+  if (memberId !== session.accountId) return refuseForeignMember();
+  const member = getMember(memberId);
+  if (!member) return jsonError(404, 'member_not_found');
+  return present(member.id);
 }
 
 export function handleRequest(
@@ -166,18 +201,12 @@ export function handleRequest(
   }
 
   if (method === 'POST' && pathname === '/loans') {
-    if (!body || typeof body !== 'object') return jsonError(400, 'invalid_json');
-    const record = body as Record<string, unknown>;
-    const bookId = typeof record.bookId === 'string' ? record.bookId : '';
-    const memberId =
-      typeof record.memberId === 'string'
-        ? record.memberId
-        : typeof record.email === 'string'
-          ? (findMemberByEmail(record.email)?.id ?? '')
-          : '';
-    if (!bookId || !memberId) return jsonError(400, 'missing_book_or_member');
+    const acting = requireActingMember(headers, body);
+    if (isRefusal(acting)) return acting;
+    const bookId = typeof acting.record.bookId === 'string' ? acting.record.bookId : '';
+    if (!bookId) return jsonError(400, 'missing_book_or_member');
     try {
-      return { status: 201, body: { loan: checkout({ bookId, memberId }) } };
+      return { status: 201, body: { loan: checkout({ bookId, memberId: acting.accountId }) } };
     } catch (error) {
       const code = errorCode(error, 'checkout_failed');
       const status =
@@ -192,8 +221,14 @@ export function handleRequest(
 
   const returnMatch = pathname.match(/^\/loans\/([^/]+)\/return$/);
   if (method === 'POST' && returnMatch) {
+    const session = requireSession(headers);
+    if (isRefusal(session)) return session;
+    const loanId = returnMatch[1] ?? '';
+    const loan = getLoan(loanId);
+    if (!loan) return jsonError(404, 'unknown_loan');
+    if (loan.memberId !== session.accountId) return refuseForeignMember();
     try {
-      return { status: 200, body: { loan: returnLoan(returnMatch[1] ?? '') } };
+      return { status: 200, body: { loan: returnLoan(loanId) } };
     } catch (error) {
       const code = errorCode(error, 'return_failed');
       return jsonError(code === 'already_returned' ? 409 : 404, code);
@@ -201,14 +236,12 @@ export function handleRequest(
   }
 
   if (method === 'POST' && pathname === '/reservations') {
-    if (!body || typeof body !== 'object') return jsonError(400, 'invalid_json');
-    const record = body as Record<string, unknown>;
-    const bookId = typeof record.bookId === 'string' ? record.bookId : '';
+    const acting = requireActingMember(headers, body);
+    if (isRefusal(acting)) return acting;
+    const bookId = typeof acting.record.bookId === 'string' ? acting.record.bookId : '';
     if (!bookId) return jsonError(400, 'missing_book_or_member');
-    const resolved = resolveMember(record);
-    if ('status' in resolved) return resolved;
     try {
-      return { status: 201, body: { reservation: reserveBook({ bookId, memberId: resolved.memberId }) } };
+      return { status: 201, body: { reservation: reserveBook({ bookId, memberId: acting.accountId }) } };
     } catch (error) {
       const code = errorCode(error, 'reservation_failed');
       if (code === 'unknown_book' || code === 'unknown_member') return jsonError(404, code);
@@ -219,8 +252,14 @@ export function handleRequest(
 
   const cancelMatch = pathname.match(/^\/reservations\/([^/]+)\/cancel$/);
   if (method === 'POST' && cancelMatch) {
+    const session = requireSession(headers);
+    if (isRefusal(session)) return session;
+    const reservationId = cancelMatch[1] ?? '';
+    const reservation = getReservation(reservationId);
+    if (!reservation) return jsonError(404, 'reservation_not_found');
+    if (reservation.memberId !== session.accountId) return refuseForeignMember();
     try {
-      return { status: 200, body: { reservation: cancelReservation(cancelMatch[1] ?? '') } };
+      return { status: 200, body: { reservation: cancelReservation(reservationId) } };
     } catch (error) {
       const code = errorCode(error, 'cancel_failed');
       if (code === 'reservation_not_found') return jsonError(404, code);
@@ -230,18 +269,12 @@ export function handleRequest(
   }
 
   if (method === 'POST' && pathname === '/holds') {
-    if (!body || typeof body !== 'object') return jsonError(400, 'invalid_json');
-    const record = body as Record<string, unknown>;
-    const bookId = typeof record.bookId === 'string' ? record.bookId : '';
-    const memberId =
-      typeof record.memberId === 'string'
-        ? record.memberId
-        : typeof record.email === 'string'
-          ? (findMemberByEmail(record.email)?.id ?? '')
-          : '';
-    if (!bookId || !memberId) return jsonError(400, 'missing_book_or_member');
+    const acting = requireActingMember(headers, body);
+    if (isRefusal(acting)) return acting;
+    const bookId = typeof acting.record.bookId === 'string' ? acting.record.bookId : '';
+    if (!bookId) return jsonError(400, 'missing_book_or_member');
     try {
-      return { status: 201, body: { hold: placeHold({ bookId, memberId }) } };
+      return { status: 201, body: { hold: placeHold({ bookId, memberId: acting.accountId }) } };
     } catch (error) {
       const code = error instanceof Error ? error.message.split(':')[0] : 'hold_failed';
       let status = 400;
@@ -256,30 +289,34 @@ export function handleRequest(
 
   const memberHolds = pathname.match(/^\/members\/([^/]+)\/holds$/);
   if (method === 'GET' && memberHolds) {
-    const member = getMember(memberHolds[1] ?? '');
-    if (!member) return jsonError(404, 'member_not_found');
-    return { status: 200, body: { holds: listHoldsForMember(member.id) } };
+    return readOwnActivity(headers, memberHolds[1] ?? '', (id) => ({
+      status: 200,
+      body: { holds: listHoldsForMember(id) },
+    }));
   }
 
   const memberNotifications = pathname.match(/^\/members\/([^/]+)\/notifications$/);
   if (method === 'GET' && memberNotifications) {
-    const member = getMember(memberNotifications[1] ?? '');
-    if (!member) return jsonError(404, 'member_not_found');
-    return { status: 200, body: { notifications: listNotificationsForMember(member.id) } };
+    return readOwnActivity(headers, memberNotifications[1] ?? '', (id) => ({
+      status: 200,
+      body: { notifications: listNotificationsForMember(id) },
+    }));
   }
 
   const memberLoans = pathname.match(/^\/members\/([^/]+)\/loans$/);
   if (method === 'GET' && memberLoans) {
-    const member = getMember(memberLoans[1] ?? '');
-    if (!member) return jsonError(404, 'member_not_found');
-    return { status: 200, body: { loans: listLoansForMember(member.id) } };
+    return readOwnActivity(headers, memberLoans[1] ?? '', (id) => ({
+      status: 200,
+      body: { loans: listLoansForMember(id) },
+    }));
   }
 
   const memberReservations = pathname.match(/^\/members\/([^/]+)\/reservations$/);
   if (method === 'GET' && memberReservations) {
-    const member = getMember(memberReservations[1] ?? '');
-    if (!member) return jsonError(404, 'member_not_found');
-    return { status: 200, body: { reservations: listReservationsForMember(member.id) } };
+    return readOwnActivity(headers, memberReservations[1] ?? '', (id) => ({
+      status: 200,
+      body: { reservations: listReservationsForMember(id) },
+    }));
   }
 
   return jsonError(404, 'not_found');

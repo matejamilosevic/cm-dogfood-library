@@ -22,6 +22,7 @@ export {
 } from './members.js';
 export {
   checkout,
+  getLoan,
   returnLoan,
   listLoansForMember,
   availableCopies,
