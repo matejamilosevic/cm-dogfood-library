@@ -1,7 +1,19 @@
-import { randomBytes, randomUUID, scryptSync } from 'node:crypto';
+import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { Member, MemberAccount, MemberAccountPublic, MemberId, SignupCredentials } from './types.js';
+import type {
+  Member,
+  MemberAccount,
+  MemberAccountPublic,
+  MemberId,
+  RateLimitEntry,
+  Session,
+  SignupCredentials,
+} from './types.js';
+
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
+const SIGN_IN_FAILURE_LIMIT = 5;
+const SIGN_IN_FAILURE_WINDOW_MS = 15 * 60 * 1000;
 
 const members = new Map<MemberId, Member>([
   ['m-1', { id: 'm-1', name: 'Ada Lovelace', email: 'ada@library.test' }],
@@ -10,6 +22,8 @@ const members = new Map<MemberId, Member>([
 ]);
 
 const accountsByUsername = new Map<string, MemberAccount>();
+const sessionsByToken = new Map<string, Session>();
+const failedAttemptsByUsername = new Map<string, RateLimitEntry>();
 let accountsFilePath: string | undefined;
 let accountsInitialized = false;
 
@@ -172,4 +186,87 @@ export function resetAccountsForTests(filePath: string): void {
   accountsByUsername.clear();
   accountsInitialized = false;
   initializeAccountStore(filePath);
+}
+
+function passwordsMatch(password: string, passwordHash: string): boolean {
+  const separator = passwordHash.indexOf(':');
+  if (separator <= 0) return false;
+  const salt = passwordHash.slice(0, separator);
+  const storedHex = passwordHash.slice(separator + 1);
+  const stored = Buffer.from(storedHex, 'hex');
+  const computed = scryptSync(password, salt, 32);
+  if (stored.length === 0 || stored.length !== computed.length) return false;
+  return timingSafeEqual(stored, computed);
+}
+
+export function verifyCredentials(username: string, password: string): MemberAccount | undefined {
+  ensureAccountsInitialized();
+  const account = accountsByUsername.get(usernameKey(username));
+  if (!account || !passwordsMatch(password, account.passwordHash)) return undefined;
+  return account;
+}
+
+export function createSession(account: MemberAccount): Session {
+  const createdAtMs = Date.now();
+  const session: Session = {
+    token: randomBytes(32).toString('hex'),
+    accountId: account.id,
+    username: account.username,
+    createdAt: new Date(createdAtMs).toISOString(),
+    expiresAt: new Date(createdAtMs + SESSION_TTL_MS).toISOString(),
+  };
+  sessionsByToken.set(session.token, session);
+  return session;
+}
+
+export function getSession(token: string): Session | undefined {
+  const session = sessionsByToken.get(token);
+  if (!session) return undefined;
+  if (Date.parse(session.expiresAt) <= Date.now()) {
+    sessionsByToken.delete(token);
+    return undefined;
+  }
+  return session;
+}
+
+export function revokeSession(token: string): boolean {
+  return sessionsByToken.delete(token);
+}
+
+export function resetSessionsForTests(): void {
+  sessionsByToken.clear();
+}
+
+function failureTimestamps(username: string, now: number): number[] {
+  const entry = failedAttemptsByUsername.get(usernameKey(username));
+  if (!entry) return [];
+  return entry.timestamps.filter((timestamp) => now - timestamp < SIGN_IN_FAILURE_WINDOW_MS);
+}
+
+export function checkRateLimit(username: string): boolean {
+  const now = Date.now();
+  const recent = failureTimestamps(username, now);
+  const key = usernameKey(username);
+  if (recent.length === 0) {
+    failedAttemptsByUsername.delete(key);
+    return false;
+  }
+  failedAttemptsByUsername.set(key, { timestamps: recent });
+  return recent.length >= SIGN_IN_FAILURE_LIMIT;
+}
+
+export function recordFailedSignIn(username: string): void {
+  const now = Date.now();
+  const key = usernameKey(username);
+  const timestamps = failureTimestamps(username, now);
+  timestamps.push(now);
+  failedAttemptsByUsername.set(key, { timestamps });
+}
+
+export function clearRateLimit(username: string): void {
+  failedAttemptsByUsername.delete(usernameKey(username));
+}
+
+export function resetRateLimitsForTests(): void {
+  failedAttemptsByUsername.clear();
 }

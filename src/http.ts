@@ -2,7 +2,18 @@ import { findBookByIsbn, getBook, listBooks } from './catalog.js';
 import { listHoldsForMember, listNotificationsForMember, placeHold } from './holds.js';
 import { availableCopies, checkout, listLoansForMember, returnLoan } from './loans.js';
 import { renderDeskHtml } from './desk.js';
-import { findMemberByEmail, getMember, registerMemberAccount } from './members.js';
+import {
+  checkRateLimit,
+  clearRateLimit,
+  createSession,
+  findMemberByEmail,
+  getMember,
+  getSession,
+  recordFailedSignIn,
+  registerMemberAccount,
+  revokeSession,
+  verifyCredentials,
+} from './members.js';
 import { cancelReservation, listReservationsForMember, reserveBook } from './reservations.js';
 import type { Book } from './types.js';
 
@@ -18,6 +29,15 @@ function jsonError(status: number, code: string): HttpResult {
 
 function errorCode(error: unknown, fallback: string): string {
   return error instanceof Error ? (error.message.split(':')[0] ?? fallback) : fallback;
+}
+
+function bearerToken(headers?: Record<string, string | string[] | undefined>): string | undefined {
+  if (!headers) return undefined;
+  const raw = headers.authorization ?? headers.Authorization;
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (typeof value !== 'string' || !value.startsWith('Bearer ')) return undefined;
+  const token = value.slice('Bearer '.length).trim();
+  return token.length > 0 ? token : undefined;
 }
 
 function bookAvailability(bookId: string) {
@@ -43,7 +63,12 @@ function resolveMember(record: Record<string, unknown>): { memberId: string } | 
   return jsonError(400, 'missing_book_or_member');
 }
 
-export function handleRequest(method: string, pathname: string, body?: unknown): HttpResult {
+export function handleRequest(
+  method: string,
+  pathname: string,
+  body?: unknown,
+  headers?: Record<string, string | string[] | undefined>,
+): HttpResult {
   if (method === 'GET' && pathname === '/') {
     return {
       status: 200,
@@ -79,6 +104,46 @@ export function handleRequest(method: string, pathname: string, body?: unknown):
       process.stderr.write('signup failed\n');
       return jsonError(500, 'signup_failed');
     }
+  }
+
+  if (method === 'POST' && pathname === '/signin') {
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+      if (body === undefined) return jsonError(400, 'missing_username_or_password');
+      return jsonError(400, 'invalid_json');
+    }
+    const record = body as Record<string, unknown>;
+    const username = typeof record.username === 'string' ? record.username.trim() : '';
+    const password = typeof record.password === 'string' ? record.password : '';
+    if (!username || password.length === 0) return jsonError(400, 'missing_username_or_password');
+    if (checkRateLimit(username)) {
+      process.stderr.write(`WARN rate limit triggered for user: ${username}\n`);
+      return jsonError(429, 'rate_limited');
+    }
+    const account = verifyCredentials(username, password);
+    if (!account) {
+      recordFailedSignIn(username);
+      process.stderr.write('WARN sign-in failed\n');
+      return jsonError(401, 'invalid_credentials');
+    }
+    clearRateLimit(username);
+    const session = createSession(account);
+    return {
+      status: 200,
+      body: {
+        token: session.token,
+        account: {
+          id: account.id,
+          username: account.username,
+          createdAt: account.createdAt,
+        },
+      },
+    };
+  }
+
+  if (method === 'POST' && pathname === '/signout') {
+    const token = bearerToken(headers);
+    if (!token || !getSession(token) || !revokeSession(token)) return jsonError(401, 'unauthorized');
+    return { status: 200, body: { ok: true } };
   }
 
   if (method === 'GET' && pathname === '/books') {
