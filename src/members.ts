@@ -21,6 +21,9 @@ const members = new Map<MemberId, Member>([
   ['m-3', { id: 'm-3', name: 'Grace Hopper', email: 'grace@library.test' }],
 ]);
 
+// Registered desk accounts can borrow, but they stay out of the seeded directory.
+const accountMembers = new Map<MemberId, Member>();
+
 const accountsByUsername = new Map<string, MemberAccount>();
 const sessionsByToken = new Map<string, Session>();
 const failedAttemptsByUsername = new Map<string, RateLimitEntry>();
@@ -41,6 +44,21 @@ function toPublicAccount(account: MemberAccount): MemberAccountPublic {
     username: account.username,
     createdAt: account.createdAt,
   };
+}
+
+function memberFromAccount(account: MemberAccount): Member {
+  return {
+    id: account.id,
+    name: account.username,
+    email: `${account.id}@accounts.library`,
+  };
+}
+
+function syncAccountMembers(): void {
+  accountMembers.clear();
+  for (const account of accountsByUsername.values()) {
+    accountMembers.set(account.id, memberFromAccount(account));
+  }
 }
 
 function isStoredAccount(value: unknown): value is MemberAccount {
@@ -82,6 +100,7 @@ function persistAccounts(): void {
 
 function loadAccounts(): void {
   accountsByUsername.clear();
+  accountMembers.clear();
   if (!accountsFilePath || !existsSync(accountsFilePath)) {
     process.stdout.write('accounts store initialized: empty\n');
     return;
@@ -102,6 +121,7 @@ function loadAccounts(): void {
   for (const account of accounts) {
     accountsByUsername.set(usernameKey(account.username), account);
   }
+  syncAccountMembers();
   process.stdout.write(`accounts store initialized: ${accountsByUsername.size} accounts loaded\n`);
 }
 
@@ -120,7 +140,7 @@ function ensureAccountsInitialized(): void {
 }
 
 export function getMember(memberId: MemberId): Member | undefined {
-  return members.get(memberId);
+  return members.get(memberId) ?? accountMembers.get(memberId);
 }
 
 export function findMemberByEmail(email: string): Member | undefined {
@@ -164,10 +184,12 @@ export function registerMemberAccount(input: SignupCredentials): MemberAccountPu
     createdAt: new Date().toISOString(),
   };
   accountsByUsername.set(key, account);
+  accountMembers.set(account.id, memberFromAccount(account));
   try {
     persistAccounts();
   } catch {
     accountsByUsername.delete(key);
+    accountMembers.delete(account.id);
     process.stderr.write('account persistence failed\n');
     throw new Error('persistence_failed');
   }
