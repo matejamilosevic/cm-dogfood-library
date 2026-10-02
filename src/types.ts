@@ -36,6 +36,25 @@ export type MemberAccount = {
 
 export type MemberAccountPublic = Pick<MemberAccount, 'id' | 'username' | 'createdAt'>;
 
+export type SignInCredentials = {
+  username: string;
+  password: string;
+};
+
+export type SessionToken = string;
+
+export type Session = {
+  token: SessionToken;
+  accountId: string;
+  username: string;
+  createdAt: string;
+  expiresAt: string;
+};
+
+export type RateLimitEntry = {
+  timestamps: number[];
+};
+
 export type Loan = {
   id: LoanId;
   bookId: BookId;

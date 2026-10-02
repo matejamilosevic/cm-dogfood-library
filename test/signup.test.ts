@@ -76,6 +76,7 @@ describe('member signup', () => {
     expect(account).not.toHaveProperty('passwordHash');
     expect(JSON.stringify(result.body)).not.toContain('secretpass123');
     expect(JSON.stringify(result.body)).not.toContain('passwordHash');
+    expect(readFileSync(getAccountsFilePath(), 'utf8')).not.toContain('secretpass123');
   });
 
   it('rejects duplicate usernames regardless of case', () => {

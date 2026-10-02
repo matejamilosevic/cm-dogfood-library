@@ -27,7 +27,7 @@ export function startServer(port = Number(process.env.PORT ?? 3456)): Server {
       }
     }
 
-    const result = handleRequest(req.method ?? 'GET', url.pathname, body);
+    const result = handleRequest(req.method ?? 'GET', url.pathname, body, req.headers);
     const headers = {
       'content-type': 'application/json',
       ...result.headers,
