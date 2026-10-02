@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { handleRequest } from '../src/http.js';
+import { authHeaders } from './session.js';
 import {
   availableCopies,
   checkout,
@@ -65,13 +66,13 @@ describe('holds', () => {
 
   it('checks out an available book for 21 days and restores availability on return (AC-003, AC-004)', () => {
     expect(availableCopies('b-1')).toBe(2);
-    const created = handleRequest('POST', '/loans', { bookId: 'b-1', memberId: 'm-1' });
+    const created = handleRequest('POST', '/loans', { bookId: 'b-1', memberId: 'm-1' }, authHeaders('m-1'));
     expect(created.status).toBe(201);
     const loan = loanFrom(created);
     expect(loan.dueAt).toBe(todayIsoDate(21));
     expect(availableCopies('b-1')).toBe(1);
 
-    const returned = handleRequest('POST', `/loans/${loan.id}/return`);
+    const returned = handleRequest('POST', `/loans/${loan.id}/return`, undefined, authHeaders('m-1'));
     expect(returned.status).toBe(200);
     expect(loanFrom(returned).returnedAt).toBe(todayIsoDate());
     expect(availableCopies('b-1')).toBe(2);
@@ -79,8 +80,8 @@ describe('holds', () => {
 
   it('places holds on a fully checked-out title in FIFO order (AC-005)', () => {
     drainCopies('b-2', 'm-3');
-    const first = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-1' });
-    const second = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' });
+    const first = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-1' }, authHeaders('m-1'));
+    const second = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' }, authHeaders('m-2'));
     expect(first.status).toBe(201);
     expect(second.status).toBe(201);
     const hold1 = holdFrom(first);
@@ -93,7 +94,7 @@ describe('holds', () => {
   });
 
   it('rejects hold placement when copies are available on the shelf (AC-006)', () => {
-    const result = handleRequest('POST', '/holds', { bookId: 'b-1', memberId: 'm-1' });
+    const result = handleRequest('POST', '/holds', { bookId: 'b-1', memberId: 'm-1' }, authHeaders('m-1'));
     expect(result.status).toBe(409);
     expect(result.body).toEqual({ error: 'copies_available' });
     expect(() => placeHold({ bookId: 'b-1', memberId: 'm-1' })).toThrow(/copies_available/);
@@ -110,7 +111,7 @@ describe('holds', () => {
     expect(placeHold({ bookId: 'b-3', memberId: 'm-1' }).status).toBe('waiting');
     expect(() => placeHold({ bookId: 'b-4', memberId: 'm-1' })).toThrow(/hold_limit_exceeded/);
 
-    const httpResult = handleRequest('POST', '/holds', { bookId: 'b-4', memberId: 'm-1' });
+    const httpResult = handleRequest('POST', '/holds', { bookId: 'b-4', memberId: 'm-1' }, authHeaders('m-1'));
     expect(httpResult.status).toBe(409);
     expect(httpResult.body).toEqual({ error: 'hold_limit_exceeded' });
   });
@@ -149,7 +150,7 @@ describe('holds', () => {
     returnLoan(loan.id);
 
     expect(() => checkout({ bookId: 'b-2', memberId: 'm-2' })).toThrow(/queue_priority_conflict/);
-    const result = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-3' });
+    const result = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-3' }, authHeaders('m-3'));
     expect(result.status).toBe(409);
     expect(result.body).toEqual({ error: 'queue_priority_conflict' });
   });
@@ -174,39 +175,39 @@ describe('holds', () => {
   });
 
   it('completes search, hold, return, and priority checkout (e2e)', () => {
-    const checkoutResult = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' });
+    const checkoutResult = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' }, authHeaders('m-1'));
     expect(checkoutResult.status).toBe(201);
     const loanId = loanFrom(checkoutResult).id;
 
     const lookup = handleRequest('GET', '/books/b-2');
     expect(lookup.body).toMatchObject({ availableCopies: 0, holdEligible: true });
 
-    const holdResult = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' });
+    const holdResult = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' }, authHeaders('m-2'));
     expect(holdResult.status).toBe(201);
     expect(holdFrom(holdResult).status).toBe('waiting');
 
-    const blocked = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-3' });
+    const blocked = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-3' }, authHeaders('m-3'));
     expect(blocked.status).toBe(409);
     expect(blocked.body).toEqual({ error: 'no_copies_available' });
 
-    const returned = handleRequest('POST', `/loans/${loanId}/return`);
+    const returned = handleRequest('POST', `/loans/${loanId}/return`, undefined, authHeaders('m-1'));
     expect(returned.status).toBe(200);
 
-    const memberHolds = handleRequest('GET', '/members/m-2/holds');
+    const memberHolds = handleRequest('GET', '/members/m-2/holds', undefined, authHeaders('m-2'));
     expect(memberHolds.status).toBe(200);
     const holds = (memberHolds.body as { holds: Hold[] }).holds;
     expect(holds[0]?.status).toBe('notified');
     expect(holds[0]?.expiresAt).toBe(todayIsoDate(7));
 
-    const notifications = handleRequest('GET', '/members/m-2/notifications');
+    const notifications = handleRequest('GET', '/members/m-2/notifications', undefined, authHeaders('m-2'));
     expect(notifications.status).toBe(200);
     expect((notifications.body as { notifications: Notification[] }).notifications).toHaveLength(1);
 
-    const stillBlocked = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-3' });
+    const stillBlocked = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-3' }, authHeaders('m-3'));
     expect(stillBlocked.status).toBe(409);
     expect(stillBlocked.body).toEqual({ error: 'queue_priority_conflict' });
 
-    const priorityCheckout = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-2' });
+    const priorityCheckout = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-2' }, authHeaders('m-2'));
     expect(priorityCheckout.status).toBe(201);
     expect(loanFrom(priorityCheckout).memberId).toBe('m-2');
     expect(listHoldsForMember('m-2')[0]?.status).toBe('fulfilled');
@@ -215,7 +216,7 @@ describe('holds', () => {
   it('rejects a duplicate active hold on the same title', () => {
     drainCopies('b-2', 'm-3');
     placeHold({ bookId: 'b-2', memberId: 'm-1' });
-    const result = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-1' });
+    const result = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-1' }, authHeaders('m-1'));
     expect(result.status).toBe(409);
     expect(result.body).toEqual({ error: 'duplicate_hold' });
   });

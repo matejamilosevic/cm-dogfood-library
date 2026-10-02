@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { todayIsoDate } from '../src/holds.js';
 import { handleRequest } from '../src/http.js';
 import { checkout, physicalAvailableCopies, resetLoansForTests } from '../src/loans.js';
+import { authHeaders } from './session.js';
 import type { Hold, Loan, Reservation } from '../src/types.js';
 
 type BookView = { id: string; copies: number; availableCopies: number };
@@ -27,19 +28,25 @@ describe('http', () => {
   });
 
   it('checks out and returns through HTTP', () => {
-    const created = handleRequest('POST', '/loans', { bookId: 'b-1', memberId: 'm-1' });
+    const created = handleRequest('POST', '/loans', { bookId: 'b-1', memberId: 'm-1' }, authHeaders('m-1'));
     expect(created.status).toBe(201);
     const loanId = (created.body as { loan: { id: string } }).loan.id;
-    const returned = handleRequest('POST', `/loans/${loanId}/return`);
+    const returned = handleRequest('POST', `/loans/${loanId}/return`, undefined, authHeaders('m-1'));
     expect(returned.status).toBe(200);
   });
 
-  it('looks up a member by email on checkout', () => {
-    const created = handleRequest('POST', '/loans', {
-      bookId: 'b-3',
-      email: 'ada@library.test',
-    });
+  it('checks out for the signed-in member when the body includes her email', () => {
+    const created = handleRequest(
+      'POST',
+      '/loans',
+      {
+        bookId: 'b-3',
+        email: 'ada@library.test',
+      },
+      authHeaders('m-1'),
+    );
     expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ loan: { bookId: 'b-3', memberId: 'm-1' } });
   });
 
   it('reports on-shelf copies when every copy is present', () => {
@@ -53,7 +60,7 @@ describe('http', () => {
   });
 
   it('reports zero available copies when every owned copy is checked out', () => {
-    const loan = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' });
+    const loan = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' }, authHeaders('m-1'));
     expect(loan.status).toBe(201);
 
     const list = handleRequest('GET', '/books');
@@ -126,14 +133,14 @@ describe('library desk', () => {
     expect(html).not.toContain('reservation.expiresAt');
   });
 
-  it('loads another member loans and holds without login', () => {
-    handleRequest('POST', '/loans', { bookId: 'b-1', memberId: 'm-2' });
+  it('loads the signed-in member loans and holds', () => {
+    handleRequest('POST', '/loans', { bookId: 'b-1', memberId: 'm-2' }, authHeaders('m-2'));
     drainCopies('b-4', 'm-3');
-    handleRequest('POST', '/holds', { bookId: 'b-4', memberId: 'm-2' });
+    handleRequest('POST', '/holds', { bookId: 'b-4', memberId: 'm-2' }, authHeaders('m-2'));
 
-    const loans = handleRequest('GET', '/members/m-2/loans');
-    const holds = handleRequest('GET', '/members/m-2/holds');
-    const reservations = handleRequest('GET', '/members/m-2/reservations');
+    const loans = handleRequest('GET', '/members/m-2/loans', undefined, authHeaders('m-2'));
+    const holds = handleRequest('GET', '/members/m-2/holds', undefined, authHeaders('m-2'));
+    const reservations = handleRequest('GET', '/members/m-2/reservations', undefined, authHeaders('m-2'));
 
     expect(loans.status).toBe(200);
     expect(loans.body).toMatchObject({ loans: [expect.objectContaining({ bookId: 'b-1', memberId: 'm-2' })] });
@@ -145,27 +152,27 @@ describe('library desk', () => {
   });
 
   it('returns empty loans, holds, and reservations for a member with none', () => {
-    expect(handleRequest('GET', '/members/m-3/loans').body).toEqual({ loans: [] });
-    expect(handleRequest('GET', '/members/m-3/holds').body).toEqual({ holds: [] });
-    expect(handleRequest('GET', '/members/m-3/reservations').body).toEqual({ reservations: [] });
+    expect(handleRequest('GET', '/members/m-3/loans', undefined, authHeaders('m-3')).body).toEqual({ loans: [] });
+    expect(handleRequest('GET', '/members/m-3/holds', undefined, authHeaders('m-3')).body).toEqual({ holds: [] });
+    expect(handleRequest('GET', '/members/m-3/reservations', undefined, authHeaders('m-3')).body).toEqual({ reservations: [] });
   });
 
   it('checks out a copy for 21 days and decrements availability', () => {
-    const created = handleRequest('POST', '/loans', { bookId: 'b-1', memberId: 'm-1' });
+    const created = handleRequest('POST', '/loans', { bookId: 'b-1', memberId: 'm-1' }, authHeaders('m-1'));
     const loan = loanFrom(created.body);
 
     expect(created.status).toBe(201);
     expect(loan.dueAt).toBe(todayIsoDate(21));
     expect(handleRequest('GET', '/books/b-1').body).toMatchObject({ availableCopies: 1 });
-    expect(handleRequest('GET', '/members/m-1/loans').body).toMatchObject({
+    expect(handleRequest('GET', '/members/m-1/loans', undefined, authHeaders('m-1')).body).toMatchObject({
       loans: [expect.objectContaining({ id: loan.id, bookId: 'b-1', dueAt: todayIsoDate(21), returnedAt: null })],
     });
     expect(deskPage()).toContain('data-available="1"');
   });
 
   it('returns a loan and restores availability', () => {
-    const created = handleRequest('POST', '/loans', { bookId: 'b-1', memberId: 'm-1' });
-    const returned = handleRequest('POST', `/loans/${loanFrom(created.body).id}/return`);
+    const created = handleRequest('POST', '/loans', { bookId: 'b-1', memberId: 'm-1' }, authHeaders('m-1'));
+    const returned = handleRequest('POST', `/loans/${loanFrom(created.body).id}/return`, undefined, authHeaders('m-1'));
 
     expect(returned.status).toBe(200);
     expect(loanFrom(returned.body).returnedAt).toBe(todayIsoDate());
@@ -173,35 +180,35 @@ describe('library desk', () => {
   });
 
   it('places a waiting hold when no copies remain', () => {
-    handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' });
+    handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' }, authHeaders('m-1'));
 
-    const created = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' });
+    const created = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' }, authHeaders('m-2'));
 
     expect(created.status).toBe(201);
     expect(holdFrom(created.body).status).toBe('waiting');
-    expect(handleRequest('GET', '/members/m-2/holds').body).toMatchObject({
+    expect(handleRequest('GET', '/members/m-2/holds', undefined, authHeaders('m-2')).body).toMatchObject({
       holds: [expect.objectContaining({ bookId: 'b-2', status: 'waiting' })],
     });
   });
 
   it('notifies a waiting hold with a 7-day pickup deadline when the copy is returned', () => {
-    const loan = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' });
-    handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' });
+    const loan = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' }, authHeaders('m-1'));
+    handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' }, authHeaders('m-2'));
 
-    const returned = handleRequest('POST', `/loans/${loanFrom(loan.body).id}/return`);
+    const returned = handleRequest('POST', `/loans/${loanFrom(loan.body).id}/return`, undefined, authHeaders('m-1'));
 
     expect(returned.status).toBe(200);
-    expect(handleRequest('GET', '/members/m-2/holds').body).toMatchObject({
+    expect(handleRequest('GET', '/members/m-2/holds', undefined, authHeaders('m-2')).body).toMatchObject({
       holds: [expect.objectContaining({ bookId: 'b-2', status: 'notified', expiresAt: todayIsoDate(7) })],
     });
   });
 
   it('picks up a notified hold as a 21-day loan', () => {
-    const loan = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' });
-    handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' });
-    handleRequest('POST', `/loans/${loanFrom(loan.body).id}/return`);
+    const loan = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' }, authHeaders('m-1'));
+    handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' }, authHeaders('m-2'));
+    handleRequest('POST', `/loans/${loanFrom(loan.body).id}/return`, undefined, authHeaders('m-1'));
 
-    const pickup = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-2' });
+    const pickup = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-2' }, authHeaders('m-2'));
 
     expect(pickup.status).toBe(201);
     expect(loanFrom(pickup.body)).toMatchObject({
@@ -210,7 +217,7 @@ describe('library desk', () => {
       dueAt: todayIsoDate(21),
       returnedAt: null,
     });
-    expect(handleRequest('GET', '/members/m-2/holds').body).toMatchObject({
+    expect(handleRequest('GET', '/members/m-2/holds', undefined, authHeaders('m-2')).body).toMatchObject({
       holds: [expect.objectContaining({ status: 'fulfilled' })],
     });
   });
@@ -220,11 +227,11 @@ describe('library desk', () => {
     drainCopies('b-2');
     drainCopies('b-3');
     drainCopies('b-4');
-    handleRequest('POST', '/holds', { bookId: 'b-1', memberId: 'm-1' });
-    handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-1' });
-    handleRequest('POST', '/holds', { bookId: 'b-3', memberId: 'm-1' });
+    handleRequest('POST', '/holds', { bookId: 'b-1', memberId: 'm-1' }, authHeaders('m-1'));
+    handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-1' }, authHeaders('m-1'));
+    handleRequest('POST', '/holds', { bookId: 'b-3', memberId: 'm-1' }, authHeaders('m-1'));
 
-    const rejected = handleRequest('POST', '/holds', { bookId: 'b-4', memberId: 'm-1' });
+    const rejected = handleRequest('POST', '/holds', { bookId: 'b-4', memberId: 'm-1' }, authHeaders('m-1'));
 
     expect(rejected.status).toBe(409);
     expect(rejected.body).toEqual({ error: 'hold_limit_exceeded' });
@@ -232,20 +239,20 @@ describe('library desk', () => {
 
   it('rejects a duplicate hold', () => {
     drainCopies('b-2');
-    handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' });
+    handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' }, authHeaders('m-2'));
 
-    const rejected = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' });
+    const rejected = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' }, authHeaders('m-2'));
 
     expect(rejected.status).toBe(409);
     expect(rejected.body).toEqual({ error: 'duplicate_hold' });
   });
 
   it('lists a member reservations and rejects an unknown member', () => {
-    handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-2' });
-    handleRequest('POST', '/reservations', { bookId: 'b-2', memberId: 'm-1' });
+    handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-2' }, authHeaders('m-2'));
+    handleRequest('POST', '/reservations', { bookId: 'b-2', memberId: 'm-1' }, authHeaders('m-1'));
 
-    const listed = handleRequest('GET', '/members/m-1/reservations');
-    const missing = handleRequest('GET', '/members/m-999/reservations');
+    const listed = handleRequest('GET', '/members/m-1/reservations', undefined, authHeaders('m-1'));
+    const missing = handleRequest('GET', '/members/m-999/reservations', undefined, authHeaders('m-999'));
 
     expect(listed.status).toBe(200);
     expect(listed.headers).toBeUndefined();
@@ -257,21 +264,21 @@ describe('library desk', () => {
   });
 
   it('picks up a held reservation without inventing a pickup deadline', () => {
-    const loan = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-2' });
-    const reserved = handleRequest('POST', '/reservations', { bookId: 'b-2', memberId: 'm-1' });
+    const loan = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-2' }, authHeaders('m-2'));
+    const reserved = handleRequest('POST', '/reservations', { bookId: 'b-2', memberId: 'm-1' }, authHeaders('m-1'));
     expect(reservationFrom(reserved.body).status).toBe('pending');
-    handleRequest('POST', `/loans/${loanFrom(loan.body).id}/return`);
+    handleRequest('POST', `/loans/${loanFrom(loan.body).id}/return`, undefined, authHeaders('m-2'));
 
-    const held = handleRequest('GET', '/members/m-1/reservations');
+    const held = handleRequest('GET', '/members/m-1/reservations', undefined, authHeaders('m-1'));
     const reservation = (held.body as { reservations: Reservation[] }).reservations[0];
     expect(reservation).toMatchObject({ bookId: 'b-2', status: 'held' });
     expect(reservation).not.toHaveProperty('expiresAt');
 
-    const pickup = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' });
+    const pickup = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' }, authHeaders('m-1'));
 
     expect(pickup.status).toBe(201);
     expect(loanFrom(pickup.body).dueAt).toBe(todayIsoDate(21));
-    expect(handleRequest('GET', '/members/m-1/reservations').body).toMatchObject({
+    expect(handleRequest('GET', '/members/m-1/reservations', undefined, authHeaders('m-1')).body).toMatchObject({
       reservations: [expect.objectContaining({ status: 'fulfilled' })],
     });
   });
@@ -279,25 +286,25 @@ describe('library desk', () => {
   it('walks checkout, hold, return, and pickup from the desk routes', () => {
     expect(deskPage()).toContain('Library desk');
 
-    const loan = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' });
+    const loan = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-1' }, authHeaders('m-1'));
     expect(loan.status).toBe(201);
     expect(loanFrom(loan.body).dueAt).toBe(todayIsoDate(21));
     expect(handleRequest('GET', '/books/b-2').body).toMatchObject({ availableCopies: 0 });
 
-    const hold = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' });
+    const hold = handleRequest('POST', '/holds', { bookId: 'b-2', memberId: 'm-2' }, authHeaders('m-2'));
     expect(holdFrom(hold.body).status).toBe('waiting');
 
-    handleRequest('POST', `/loans/${loanFrom(loan.body).id}/return`);
-    expect(handleRequest('GET', '/members/m-2/holds').body).toMatchObject({
+    handleRequest('POST', `/loans/${loanFrom(loan.body).id}/return`, undefined, authHeaders('m-1'));
+    expect(handleRequest('GET', '/members/m-2/holds', undefined, authHeaders('m-2')).body).toMatchObject({
       holds: [expect.objectContaining({ status: 'notified', expiresAt: todayIsoDate(7) })],
     });
 
-    const pickup = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-2' });
+    const pickup = handleRequest('POST', '/loans', { bookId: 'b-2', memberId: 'm-2' }, authHeaders('m-2'));
     expect(loanFrom(pickup.body)).toMatchObject({ memberId: 'm-2', bookId: 'b-2', dueAt: todayIsoDate(21) });
-    expect(handleRequest('GET', '/members/m-2/holds').body).toMatchObject({
+    expect(handleRequest('GET', '/members/m-2/holds', undefined, authHeaders('m-2')).body).toMatchObject({
       holds: [expect.objectContaining({ status: 'fulfilled' })],
     });
-    expect(handleRequest('GET', '/members/m-2/loans').body).toMatchObject({
+    expect(handleRequest('GET', '/members/m-2/loans', undefined, authHeaders('m-2')).body).toMatchObject({
       loans: [expect.objectContaining({ bookId: 'b-2', returnedAt: null })],
     });
   });
